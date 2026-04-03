@@ -702,7 +702,7 @@ print(response2.content[0].text)
 # chatbot_v2_with_memory.py
 class NetworkChatbot:
     def __init__(self):
-        self.ollama_url = "http://localhost:11434/api/generate"
+        self.client = anthropic.Anthropic()
         self.conversation_history = []
         self.system_prompt = """You are a network engineer assistant.
 
@@ -915,7 +915,7 @@ print(bgp)
 # agentic_network_bot.py (provided)
 class AgenticNetworkBot:
     def __init__(self):
-        self.ollama_url = "http://localhost:11434/api/generate"
+        self.client = anthropic.Anthropic()
         self.tools_map = {
             "get_device_status": get_device_status,
             "get_bgp_summary": get_bgp_summary,

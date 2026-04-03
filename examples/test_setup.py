@@ -1,150 +1,94 @@
 #!/usr/bin/env python3
 """
-Environment Setup Test Script
-AI Networking Workshop
-
-Run this script to verify your environment is ready for the workshop.
+Workshop Environment Test Script
+Tests that everything is set up correctly for 100% Ollama-based workshop
 """
 
 import sys
 import subprocess
-import importlib.util
+import requests
+from pathlib import Path
 
-def check_python_version():
-    """Check Python version"""
-    print("Checking Python version...")
+
+def print_header(text):
+    print(f"\n{'='*70}")
+    print(f"  {text}")
+    print(f"{'='*70}\n")
+
+
+def check_python():
+    print_header("Python Version Check")
     version = sys.version_info
     if version.major >= 3 and version.minor >= 10:
-        print(f"  ✅ Python {version.major}.{version.minor}.{version.micro}")
+        print(f"✅ Python {version.major}.{version.minor}.{version.micro}")
         return True
-    else:
-        print(f"  ❌ Python {version.major}.{version.minor}.{version.micro} (need 3.10+)")
-        return False
+    print(f"❌ Python {version.major}.{version.minor} - Need 3.10+")
+    return False
+
 
 def check_ollama():
-    """Check if Ollama is installed and running"""
-    print("\nChecking Ollama...")
+    print_header("Ollama Check")
     try:
-        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            print("  ✅ Ollama is installed")
-            if 'llama3.2' in result.stdout:
-                print("  ✅ llama3.2:3b model found")
-            else:
-                print("  ⚠️  llama3.2:3b model not found")
-                print("     Run: ollama pull llama3.2:3b")
-            return True
-        else:
-            print("  ❌ Ollama not responding")
-            return False
-    except FileNotFoundError:
-        print("  ❌ Ollama not installed")
-        print("     Install from: https://ollama.com/")
-        return False
-    except Exception as e:
-        print(f"  ❌ Error checking Ollama: {e}")
-        return False
-
-def check_package(package_name, import_name=None):
-    """Check if a Python package is installed"""
-    if import_name is None:
-        import_name = package_name
-    
-    spec = importlib.util.find_spec(import_name)
-    if spec is not None:
-        print(f"  ✅ {package_name}")
-        return True
-    else:
-        print(f"  ❌ {package_name} not installed")
-        return False
-
-def check_python_packages():
-    """Check required Python packages"""
-    print("\nChecking Python packages...")
-    packages = [
-        ('requests', 'requests'),
-        ('anthropic', 'anthropic'),
-    ]
-    
-    all_installed = True
-    for pkg_name, import_name in packages:
-        if not check_package(pkg_name, import_name):
-            all_installed = False
-    
-    if not all_installed:
-        print("\n  Install missing packages:")
-        print("  pip install -r requirements.txt")
-    
-    return all_installed
-
-def check_api_key():
-    """Check if Anthropic API key is set"""
-    print("\nChecking API key...")
-    import os
-    if os.getenv('ANTHROPIC_API_KEY'):
-        print("  ✅ ANTHROPIC_API_KEY is set")
-        return True
-    else:
-        print("  ⚠️  ANTHROPIC_API_KEY not set (optional for Labs 1-2)")
-        print("     Required for Labs 3-4")
-        print("     Set with: export ANTHROPIC_API_KEY=your-key-here")
-        return False
-
-def test_mock_devices():
-    """Test mock network devices"""
-    print("\nTesting mock network devices...")
-    try:
-        # Try to import from examples directory
-        sys.path.insert(0, 'examples')
-        from mock_network_devices import get_device_status
+        subprocess.run(["ollama", "--version"], capture_output=True, timeout=5)
+        print("✅ Ollama installed")
         
-        result = get_device_status('spine1')
-        if result.get('status') == 'up':
-            print("  ✅ Mock devices working")
-            return True
-        else:
-            print("  ❌ Mock devices returned unexpected result")
+        # Check if running
+        try:
+            response = requests.get("http://localhost:11434/api/tags", timeout=5)
+            print("✅ Ollama service running")
+            
+            # Check model
+            data = response.json()
+            models = [m["name"] for m in data.get("models", [])]
+            if any("llama3.2:3b" in m for m in models):
+                print("✅ llama3.2:3b model installed")
+                return True
+            else:
+                print("❌ llama3.2:3b not found")
+                print("   Run: ollama pull llama3.2:3b")
+                return False
+        except:
+            print("❌ Ollama not running")
+            print("   Run: ollama serve")
             return False
-    except ImportError:
-        print("  ❌ Cannot import mock_network_devices")
-        print("     Make sure you're in the workshop directory")
+    except:
+        print("❌ Ollama not installed")
+        print("   macOS: brew install ollama")
         return False
-    except Exception as e:
-        print(f"  ❌ Error testing mock devices: {e}")
-        return False
+
+
+def check_labs():
+    print_header("Lab Files Check")
+    labs = [
+        "labs/lab1-ollama/simple_ollama_test.py",
+        "labs/lab3-chatbot/chatbot_v2_with_memory.py",
+        "labs/lab4-agentic/agentic_network_bot_ollama.py"
+    ]
+    all_ok = True
+    for lab in labs:
+        if Path(lab).exists():
+            print(f"✅ {lab}")
+        else:
+            print(f"❌ {lab} missing")
+            all_ok = False
+    return all_ok
+
 
 def main():
-    """Run all checks"""
-    print("="*70)
-    print("AI Networking Workshop - Environment Test")
-    print("="*70)
+    print("\n🤖 AI Networking Workshop - Setup Test".center(70))
+    print("100% Free with Ollama - No API Keys!".center(70))
     
-    checks = [
-        check_python_version(),
-        check_ollama(),
-        check_python_packages(),
-        check_api_key(),
-        test_mock_devices()
-    ]
+    checks = [check_python(), check_ollama(), check_labs()]
     
-    print("\n" + "="*70)
-    print("Summary:")
-    print("="*70)
-    
-    passed = sum(checks)
-    total = len(checks)
-    
-    if passed == total:
-        print(f"✅ All checks passed ({passed}/{total})")
-        print("\nYou're ready for the workshop! 🎉")
-    elif passed >= 3:
-        print(f"⚠️  Most checks passed ({passed}/{total})")
-        print("\nYou can start the workshop, but some labs may not work")
+    print_header("Summary")
+    if all(checks):
+        print("✅ All checks passed! You're ready!")
+        print("\nNext: python3 labs/lab1-ollama/simple_ollama_test.py\n")
+        return 0
     else:
-        print(f"❌ Several checks failed ({passed}/{total})")
-        print("\nPlease fix the issues above before starting")
-    
-    print("="*70)
+        print("❌ Some checks failed - fix issues above\n")
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
