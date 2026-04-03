@@ -3,15 +3,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![macOS Compatible](https://img.shields.io/badge/macOS-compatible-green.svg)]()
+[![100% Free](https://img.shields.io/badge/cost-$0-brightgreen.svg)]()
 
-> **Build autonomous AI agents for network operations** - A hands-on workshop teaching network engineers to create production-ready AI systems from scratch.
+> **Build autonomous AI agents for network operations** - A hands-on workshop teaching network engineers to create production-ready AI systems from scratch. **100% free using Ollama - no API keys required!**
 
 ## 🎯 Workshop Overview
 
 **Duration:** 3.25 hours  
 **Format:** Hands-on labs with live instruction  
 **Level:** Intermediate network engineers  
-**Platform:** 100% macOS compatible (no VM needed!)
+**Platform:** 100% macOS compatible (no VM needed!)  
+**Cost:** $0 - Completely free using local Ollama
 
 ### What Makes This Workshop Unique
 
@@ -24,7 +26,7 @@ While most AI workshops teach you to *use* AI tools like ChatGPT and GitHub Copi
 - ✅ Create autonomous agents with tool calling
 - ✅ Deploy agents to network infrastructure
 
-**Key Differentiator:** Focus on building, not just using. You'll create a complete autonomous network agent that can troubleshoot, investigate, and operate your network devices.
+**Key Differentiator:** Focus on building, not just using. You'll create a complete autonomous network agent that can troubleshoot, investigate, and operate your network devices - **all running locally on your laptop for free!**
 
 ## 🚀 Quick Start
 
@@ -33,31 +35,29 @@ While most AI workshops teach you to *use* AI tools like ChatGPT and GitHub Copi
 ```bash
 # Check your versions
 python3 --version  # Need 3.10+
-docker --version   # Optional
 git --version
 
-# Install Ollama (if not installed)
+# Install Ollama (macOS)
 brew install ollama
 
-# Pull LLM models
-ollama pull llama3.2:3b
+# Or download from: https://ollama.com/download
 ```
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ai-networking-workshop.git
+git clone https://github.com/sifbaksh/ai-networking-workshop.git
 cd ai-networking-workshop
 
-# Install Python dependencies
+# Install Python dependencies (just requests!)
 pip3 install -r requirements.txt
+
+# Pull LLM model (one-time, ~2GB download)
+ollama pull llama3.2:3b
 
 # Test the environment
 python3 examples/test_setup.py
-
-# Optional: Set API key for Labs 3-4
-export ANTHROPIC_API_KEY=your-key-here
 ```
 
 ### Run Your First Lab
@@ -69,359 +69,337 @@ python3 labs/lab1-ollama/simple_ollama_test.py
 # Lab 2: Prompt engineering
 python3 labs/lab2-prompts/prompt_engineering_pene.py
 
-# Lab 3: Network chatbot (requires API key)
+# Lab 3: Network chatbot with memory
 python3 labs/lab3-chatbot/chatbot_v2_with_memory.py
 
-# Lab 4: Agentic network bot (requires API key)
-python3 labs/lab4-agentic/agentic_network_bot.py
+# Lab 4: Autonomous agentic network bot ⭐
+python3 labs/lab4-agentic/agentic_network_bot_ollama.py
 ```
+
+**That's it!** All labs work with Ollama - no API keys, no cloud services, no cost.
 
 ## 📚 Workshop Structure
 
-| Time | Module | Type | What You'll Build |
-|------|--------|------|-------------------|
-| 0:00 | Setup & Welcome | Intro | Environment verification |
-| 0:10 | How LLMs Work | Theory | Mental models |
-| 0:30 | **Lab 1:** Ollama | Hands-on | Local LLM queries |
-| 0:45 | Prompt Engineering | Theory | P.E.N.E. framework |
-| 1:00 | **Lab 2:** AI-Assisted Dev | Hands-on | Ansible playbooks |
-| 1:25 | LLM APIs & Tool Calling | Theory | Function calling |
-| 1:40 | **Lab 3:** Network Chatbot | Hands-on | Stateful bot |
-| 2:05 | **BREAK** | — | 10 minutes |
-| 2:15 | Agentic Patterns | Theory | Autonomous systems |
-| 2:35 | **Lab 4:** Production Agent | Hands-on | 🌟 **Star Lab** |
-| 3:10 | Production Path | Demo | Real deployment |
-| 3:20 | Wrap-Up | Q&A | Next steps |
+### Theory Modules (85 minutes)
 
-**Total:** 195 minutes (3.25 hours)
+**Module 1: How LLMs Work** (20 min)
+- Tokenization and embeddings
+- Context windows and attention
+- Temperature and sampling
+- Why local models (Ollama) work great
 
-## 🌟 The Star Lab: Autonomous Network Agent
+**Module 2: Prompt Engineering** (15 min)
+- The P.E.N.E. framework
+- Persona, Examples, kNowledge, Evaluation
+- Production prompt templates
 
-Lab 4 is where everything comes together. You'll build a complete AI agent that:
+**Module 3: LLM APIs** (15 min)
+- Ollama API basics
+- Building conversation history
+- Managing context windows
 
-- **Autonomously investigates** network issues
-- **Operates mock devices** (production-ready code)
-- **Makes multi-step decisions** without hardcoded logic
-- **Troubleshoots intelligently** using 6 network tools
+**Module 4: Agentic Patterns** (20 min)
+- What makes an agent autonomous
+- Tool calling with structured prompts
+- Multi-step reasoning loops
 
-**Mock Network Topology:**
-```
-spine1 (192.168.0.11) ─┬─ leaf1 (192.168.0.21)
-                       └─ leaf2 (192.168.0.22)
-spine2 (192.168.0.12) ─┘
-```
+**Module 5: Production Path** (10 min)
+- Mock devices → Real SSH
+- Error handling and retries
+- Deployment strategies
 
-**Example Query:**
-```python
-bot = AgenticNetworkBot()
-bot.chat("Are all BGP sessions up in the network?")
+### Hands-On Labs (110 minutes)
 
-# Agent autonomously:
-# 1. Calls get_bgp_summary('spine1')
-# 2. Calls get_bgp_summary('spine2')
-# 3. Calls get_bgp_summary('leaf1')
-# 4. Calls get_bgp_summary('leaf2')
-# 5. Synthesizes: "Yes, all BGP sessions established except leaf2 to spine2..."
-```
-
-## 📖 Lab Details
-
-### Lab 1: Ollama + Network Prompts (15 min)
-
-Learn to use local LLMs for network tasks.
-
-**Skills:**
+**Lab 1: Ollama + Network Prompts** (15 min)
 - Call Ollama API from Python
-- Generate structured JSON output
-- Parse network device output
+- Control generation parameters
+- Parse structured JSON output
+- Compare models (llama3.2 vs llama3.1)
 
-**Files:**
-- `simple_ollama_test.py`
-- `json_output_challenge.py`
+**Lab 2: Prompt Engineering** (25 min)
+- Apply P.E.N.E. framework
+- Build config parser prompts
+- Create alert triage prompts
+- Test and iterate
 
----
+**Lab 3: Network Chatbot** (25 min)
+- Build stateless chatbot (see the problem)
+- Add conversation memory (fix it)
+- Manage context windows
+- Interactive CLI
 
-### Lab 2: Prompt Engineering (25 min)
+**Lab 4: Agentic Network Bot** ⭐ (35 min)
+- Define network tools (device status, BGP, interfaces)
+- Implement autonomous tool calling
+- Multi-step troubleshooting
+- Test on mock network
 
-Master the P.E.N.E. framework for production prompts.
+**Break:** 10 minutes
 
-**P.E.N.E. Framework:**
-- **P**ersona & **P**urpose
-- **E**xamples
-- k**N**owledge & co**N**straints
-- **E**valuation
+## 🎁 What's Included
 
-**Skills:**
-- Config parser prompts
-- Alert triage prompts
-- Documentation generation
-- Risk scoring
+### Complete Lab Code
+- ✅ Lab 1: Ollama basics (2 Python files)
+- ✅ Lab 2: Prompt engineering (2 files)
+- ✅ Lab 3: Chatbot (2 files)
+- ✅ Lab 4: Agentic bot (1 file) ⭐
 
-**Files:**
-- `prompt_engineering_pene.py`
-- `PROMPT_TEMPLATES.md` (5 production templates)
+### Mock Network Infrastructure
+- ✅ 4-device spine-leaf topology
+- ✅ Realistic Arista cEOS behavior
+- ✅ Built-in troubleshooting scenarios
+- ✅ BGP, interfaces, reachability
 
----
+### Documentation
+- ✅ Complete workshop outline (23 pages)
+- ✅ Setup guides (macOS, Linux, Windows)
+- ✅ Prompt template library
+- ✅ Production migration examples
 
-### Lab 3: Network Chatbot (25 min)
+### Presentation
+- ✅ Full Slidev deck (~120 slides)
+- ✅ Code examples and demos
+- ✅ Interactive animations
 
-Build a stateful chatbot with conversation memory.
+## 🏗️ Mock Network Topology
 
-**Skills:**
-- Maintain conversation history
-- System prompts for network engineering
-- Token counting and management
-- Save/load conversations
-
-**Files:**
-- `chatbot_v1_stateless.py` (shows the problem)
-- `chatbot_v2_with_memory.py` (complete solution)
-
----
-
-### Lab 4: Agentic Network Bot (35 min) 🌟
-
-Build an autonomous agent that operates network devices.
-
-**Skills:**
-- Tool calling and schemas
-- Agentic loop architecture
-- Multi-step reasoning
-- Network device integration
-
-**Available Tools:**
-- `get_device_status()` - Device info
-- `get_bgp_summary()` - BGP neighbors
-- `get_interface_status()` - Interface state
-- `ping_device()` - Reachability test
-- `execute_command()` - Show commands
-- `get_topology_info()` - Network structure
-
-**Files:**
-- `agentic_network_bot.py` - Complete agent
-- `mock_network_devices.py` - Device simulator
-
----
-
-## 🌐 Mock Network Devices
-
-All labs use realistic mock devices that work on any OS (macOS, Windows, Linux).
-
-**Why Mock Devices?**
-
-❌ **Traditional Approach (Containerlab):**
-- Requires Linux
-- 60+ minute setup
-- VM overhead
-- 8GB+ RAM
-
-✅ **Our Approach (Mock Devices):**
-- Works on macOS natively
-- 5 minute setup
-- Minimal resources
-- Focus on AI agent development
-
-### Production Migration
-
-**Workshop Code:**
-```python
-def get_device_status(device: str) -> dict:
-    return MOCK_DEVICES.get(device)
+```
+spine1 (192.168.0.11) ──┬── leaf1 (192.168.0.21)
+                        └── leaf2 (192.168.0.22)
+spine2 (192.168.0.12) ──┘
 ```
 
-**Production Code:**
+**Built-in Scenarios:**
+- ✅ BGP sessions up on spine1, spine2, leaf1
+- ❌ leaf2 BGP session down (Idle state)
+- ❌ leaf2 Ethernet3 interface down
+
+Perfect for testing autonomous troubleshooting!
+
+## 💡 Why Ollama?
+
+### 100% Free
+- No API keys required
+- No usage limits
+- No credit card
+- No account signup
+
+### Privacy & Control
+- Runs entirely on your laptop
+- No data sent to cloud
+- Works offline
+- Full control over models
+
+### Production-Ready
+- Same patterns work with any LLM
+- Swap Ollama → OpenAI/Claude with 1 line
+- Agent code stays identical
+
+### Educational
+- See how tool calling really works
+- Understand LLM internals
+- Debug locally
+- No black boxes
+
+## 🔧 Technical Stack
+
+**Required (Free):**
+- Python 3.10+
+- Ollama (llama3.2:3b, ~2GB)
+- Mock network devices (included)
+
+**Optional:**
+- llama3.1:8b for better quality (but slower)
+- Claude/GPT for comparison (not needed)
+
+**NOT Required:**
+- ❌ API keys
+- ❌ Cloud accounts
+- ❌ Docker Desktop
+- ❌ Virtual machines
+- ❌ Network simulators
+
+## 🎯 Learning Outcomes
+
+By the end of this workshop, you will be able to:
+
+1. **Explain LLM fundamentals** - How tokenization, attention, and sampling work
+2. **Write production prompts** - Using P.E.N.E. framework for consistent results
+3. **Build stateful chatbots** - Managing conversation history and context
+4. **Create autonomous agents** - Implementing tool calling with structured prompts
+5. **Deploy to production** - Migration path from mock to real devices
+
+## 📈 Workshop Flow
+
+```
+0:00 - Setup check (10 min)
+0:10 - How LLMs work (20 min)
+0:30 - Lab 1: Ollama (15 min)
+0:45 - Prompt engineering (15 min)
+1:00 - Lab 2: Prompts (25 min)
+1:25 - LLM APIs (15 min)
+1:40 - Lab 3: Chatbot (25 min)
+2:05 - BREAK (10 min)
+2:15 - Agentic patterns (20 min)
+2:35 - Lab 4: Agents ⭐ (35 min)
+3:10 - Production path (10 min)
+3:20 - Wrap-up & Q&A (15 min)
+```
+
+## 🚀 Production Migration
+
+### The Pattern
+
+**Workshop (Mock Devices):**
+```python
+from examples.mock_network_devices import get_device_status
+
+status = get_device_status("spine1")
+# Returns: {"hostname": "spine1", "version": "4.28.0F", ...}
+```
+
+**Production (Your Network):**
 ```python
 import paramiko
 
-def get_device_status(device: str) -> dict:
+def get_device_status(device):
     ssh = paramiko.SSHClient()
-    ssh.connect(device, username='admin', key_filename='~/.ssh/id_rsa')
-    stdin, stdout, stderr = ssh.exec_command('show version')
-    return parse_output(stdout.read().decode())
+    ssh.connect(device, username="admin", password=...)
+    stdin, stdout, stderr = ssh.exec_command("show version | json")
+    return json.loads(stdout.read())
 ```
 
-**Agent code stays identical** - just swap the tool functions!
+**Your agent code doesn't change!** Just swap the backend function.
 
-## 📦 Repository Structure
+## 🎓 Who Should Attend
 
-```
-ai-networking-workshop/
-├── README.md                    # This file
-├── requirements.txt             # Python dependencies
-├── LICENSE                      # MIT License
-│
-├── docs/                        # Documentation
-│   ├── COMPLETE_OUTLINE.md      # Full workshop outline
-│   ├── SETUP_GUIDE.md           # Environment setup
-│   └── TROUBLESHOOTING.md       # Common issues
-│
-├── labs/                        # All lab code
-│   ├── lab1-ollama/
-│   │   ├── simple_ollama_test.py
-│   │   └── json_output_challenge.py
-│   ├── lab2-prompts/
-│   │   ├── prompt_engineering_pene.py
-│   │   └── PROMPT_TEMPLATES.md
-│   ├── lab3-chatbot/
-│   │   ├── chatbot_v1_stateless.py
-│   │   └── chatbot_v2_with_memory.py
-│   └── lab4-agentic/
-│       └── agentic_network_bot.py
-│
-├── examples/                    # Utilities and examples
-│   ├── mock_network_devices.py  # Device simulator
-│   ├── test_setup.py            # Environment test
-│   └── production_examples/     # Real device code
-│
-└── solutions/                   # Reference solutions
-    └── [completed lab code]
-```
+**Ideal for:**
+- Network engineers learning AI automation
+- DevOps/NetOps teams exploring AI
+- Anyone automating network operations
+- Python developers in networking
 
-## 🎓 Learning Outcomes
+**Prerequisites:**
+- Basic Python programming
+- Understanding of networking (BGP, OSPF, SSH)
+- Laptop with Python 3.10+
 
-After completing this workshop, you will:
+**NOT required:**
+- AI/ML background
+- Deep learning knowledge
+- Paid API access
+- Expensive hardware
 
-✅ Understand LLM architecture (tokenization, context windows, parameters)  
-✅ Write production-quality prompts using systematic frameworks  
-✅ Build stateful chatbots with conversation memory  
-✅ Create autonomous AI agents with tool calling  
-✅ Deploy agents to network infrastructure  
-✅ Recognize when to use AI vs. traditional automation  
+## 📊 Success Metrics
 
-## 💡 Key Concepts
+**During Workshop:**
+- 90%+ complete all labs
+- Working chatbot by Lab 3
+- Autonomous agent by Lab 4
+- Understanding production path
 
-### The P.E.N.E. Framework
+**Post-Workshop:**
+- 70%+ deploy to their networks
+- 5+ custom implementations
+- Active community engagement
 
-Our systematic approach to prompt engineering:
+## 🌟 Key Features
 
-- **P**ersona & **P**urpose - Define role and goal
-- **E**xamples - Show input/output patterns
-- k**N**owledge & co**N**straints - Provide context and limits
-- **E**valuation - Test and iterate
+### Zero Cost
+All labs use Ollama - **completely free forever**
 
-### The Agentic Loop
+### Zero Friction
+15-minute setup, works on any laptop
 
-```
-User Query
-   ↓
-LLM decides which tools to call
-   ↓
-Execute tools (your code)
-   ↓
-Results back to LLM
-   ↓
-LLM synthesizes answer OR calls more tools
-   ↓
-Repeat until done
-```
+### Production-Ready
+Not toy examples - real patterns used in production
 
-**Key Insight:** The LLM decides the investigation strategy, not hardcoded logic.
+### Platform Agnostic
+macOS, Linux, Windows all supported
 
-## 🔧 Requirements
+### Privacy-First
+All processing happens locally on your machine
 
-### Software (Required)
+## 📖 Documentation
 
-- **Python 3.10+**
-- **Ollama** - https://ollama.com/
-- **Git**
-
-### Software (Optional)
-
-- **Docker Desktop** - For future advanced labs
-- **VS Code** - Recommended editor
-
-### API Keys (Optional)
-
-- **Anthropic API** - For Labs 3-4 (or use Ollama)
-  - Get key: https://console.anthropic.com/
-  - Estimated cost: $1-5 for workshop
-
-### Models
-
-```bash
-# Free local models (Ollama)
-ollama pull llama3.2:3b      # Fast, good quality
-ollama pull llama3.1:8b      # Slower, better quality
-```
-
-## 🚀 Beyond the Workshop
-
-### Next Steps (Week 1)
-
-- Experiment with different prompts
-- Add custom tools to the agent
-- Test with your own network data
-
-### Production Deployment (Month 1-2)
-
-1. Replace mock devices with SSH/API calls
-2. Add authentication and authorization
-3. Implement audit logging
-4. Add approval workflows for risky operations
-5. Deploy as internal service
-
-### Advanced Projects
-
-- Multi-agent systems (specialized agents)
-- SOAR platform integration
-- Autonomous monitoring and alerting
-- Configuration compliance checking
-
-## 📚 Resources
-
-### Documentation
-
-- [Complete Workshop Outline](docs/COMPLETE_OUTLINE.md)
-- [Setup Guide](docs/SETUP_GUIDE.md)
-- [Troubleshooting](docs/TROUBLESHOOTING.md)
-
-### External Resources
-
-- [MCP Specification](https://modelcontextprotocol.io/)
-- [Anthropic Documentation](https://docs.anthropic.com/)
-- [Ollama Documentation](https://ollama.com/)
-
-### Community
-
-- Workshop Discord: [link]
-- GitHub Discussions: [link]
-- Office Hours: [schedule]
+- **[Quick Start](QUICKSTART.md)** - Get running in 5 minutes
+- **[Setup Guide](docs/SETUP_GUIDE.md)** - Detailed installation
+- **[Workshop Outline](docs/COMPLETE_WORKSHOP_OUTLINE.md)** - Full agenda
+- **[Contributing](CONTRIBUTING.md)** - How to contribute
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see:
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Code style guide
+- How to submit issues
+- Pull request process
+- Areas needing help
 
-- Issues for bug reports and feature requests
-- Pull requests for code improvements
-- Discussions for questions and ideas
+## 📜 License
 
-**Areas where we'd love help:**
-- Additional network tools
-- Real device integration examples
-- Custom prompt templates
-- Production deployment patterns
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Anthropic for Claude and MCP
-- Ollama community
-- Workshop participants and contributors
+- **Ollama** for making LLMs accessible and free
+- **Meta** for Llama models
+- **Network automation community** for inspiration
+- **Workshop attendees** for feedback
 
-## 💬 Questions?
+## 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ai-networking-workshop/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ai-networking-workshop/discussions)
-- **Email:** your-email@example.com
-- **LinkedIn:** [Your Profile](https://linkedin.com/in/sifbaksh)
+- **Issues:** [GitHub Issues](https://github.com/sifbaksh/ai-networking-workshop/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/sifbaksh/ai-networking-workshop/discussions)
+- **Email:** Contact via GitHub
+- **Blog:** [sifbaksh.com](https://sifbaksh.com)
+
+## 🗺️ Roadmap
+
+**v1.0 (Current)**
+- All 4 labs with Ollama
+- Mock device simulator
+- Complete documentation
+- Slidev presentation
+
+**v1.1 (Future)**
+- Advanced multi-agent patterns
+- Real device integration examples
+- Video walkthroughs
+- Community contributions
+
+**v2.0 (Vision)**
+- SOAR platform integration
+- Observability patterns
+- Multi-model support
+- Advanced troubleshooting
+
+---
+
+## 🎉 Ready to Get Started?
+
+```bash
+# 1. Install Ollama
+brew install ollama
+
+# 2. Clone this repo
+git clone https://github.com/sifbaksh/ai-networking-workshop.git
+cd ai-networking-workshop
+
+# 3. Install dependencies
+pip3 install -r requirements.txt
+
+# 4. Pull model
+ollama pull llama3.2:3b
+
+# 5. Run first lab
+python3 labs/lab1-ollama/simple_ollama_test.py
+```
+
+**You're now building AI agents!** 🚀
 
 ---
 
 **Workshop Date:** March 31, 2026  
-**Version:** 2.0 (macOS Compatible)  
-**Status:** ✅ Ready for delivery
-
-**Built for network engineers who want to BUILD AI agents, not just USE AI tools.**
+**Created by:** Sif Baksh  
+**License:** MIT  
+**Cost:** $0 Forever

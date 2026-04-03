@@ -1,24 +1,32 @@
 # Quick Start Guide
 ## Get Running in 5 Minutes
 
+**100% Free using Ollama - No API keys required!**
+
 This guide gets you from zero to running your first lab in 5 minutes.
 
 ## Prerequisites
 
-- macOS (or Linux/Windows)
-- 15 minutes of time
-- Internet connection
+- macOS, Linux, or Windows
+- 5-10 minutes of time
+- Internet connection (for initial setup only)
 
 ## Installation
 
 ### 1. Install Ollama (2 min)
 
+**macOS:**
 ```bash
-# macOS
 brew install ollama
-
-# Or download from https://ollama.com/download
 ```
+
+**Linux:**
+```bash
+curl https://ollama.ai/install.sh | sh
+```
+
+**Windows:**
+Download from https://ollama.com/download
 
 ### 2. Pull Model (2 min)
 
@@ -26,52 +34,72 @@ brew install ollama
 ollama pull llama3.2:3b
 ```
 
+This downloads ~2GB. Only needed once!
+
 ### 3. Clone Repository (1 min)
 
 ```bash
 git clone https://github.com/sifbaksh/ai-networking-workshop.git
 cd ai-networking-workshop
+
+# Install Python dependencies (just requests!)
 pip3 install -r requirements.txt
 ```
 
 ## Run Your First Lab
 
 ```bash
-# Test Ollama
+# Test Ollama connection
 python3 labs/lab1-ollama/simple_ollama_test.py
 ```
 
-Expected output:
+**Expected output:**
 ```
 🤖 Ollama API Test - AI Networking Workshop
 ==================================================
 
 📝 Test 1: Simple Chat
-Response: OSPF is a link-state routing protocol...
+Response: OSPF (Open Shortest Path First) is a link-state routing protocol...
+Tokens: 156
 ```
+
+**✅ Success!** You're now running AI agents locally!
 
 ## What's Next?
 
-### Without API Key (Free)
-- ✅ Lab 1: Ollama basics
-- ✅ Lab 2: Prompt engineering
-
-### With API Key ($1-5)
-- Lab 3: Network chatbot
-- Lab 4: Agentic bot (the star!)
-
-Get API key: https://console.anthropic.com/
+### All Labs Work with Ollama (Free!)
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-your-key
+# Lab 1: Ollama basics
+python3 labs/lab1-ollama/simple_ollama_test.py
+
+# Lab 2: Prompt engineering
+python3 labs/lab2-prompts/prompt_engineering_pene.py
+
+# Lab 3: Network chatbot
 python3 labs/lab3-chatbot/chatbot_v2_with_memory.py
+
+# Lab 4: Autonomous agent ⭐
+python3 labs/lab4-agentic/agentic_network_bot_ollama.py
 ```
+
+**All 4 labs - $0 cost!**
 
 ## Troubleshooting
 
 **Ollama not connecting?**
 ```bash
+# Start Ollama service
 ollama serve
+```
+
+**Model not found?**
+```bash
+# Check installed models
+ollama list
+
+# Pull if missing
+ollama pull llama3.2:3b
 ```
 
 **Import errors?**
@@ -86,20 +114,33 @@ pip3 install -r requirements.txt --upgrade
 
 ## Skip to the Good Stuff
 
-Want to see the agent in action?
+Want to see the autonomous agent in action?
 
 ```bash
-# Set API key
-export ANTHROPIC_API_KEY=your-key
-
 # Jump to Lab 4 (star lab)
 cd labs/lab4-agentic
-python3 agentic_network_bot.py
+python3 agentic_network_bot_ollama.py
 ```
 
 This runs an autonomous AI agent that troubleshoots a mock network!
+
+**Sample interaction:**
+```
+👤 User: Check if leaf2 has any issues
+🔧 Agent is calling: get_device_status({"device": "leaf2"})
+🔧 Agent is calling: get_bgp_summary({"device": "leaf2"})
+🔧 Agent is calling: get_interface_status({"device": "leaf2", "interface": "Ethernet3"})
+🤖 Agent: leaf2 has two issues:
+  1. BGP session to 192.168.0.11 is in Idle state
+  2. Interface Ethernet3 is down
+  Recommend checking physical connectivity and BGP configuration.
+```
 
 ---
 
 **Full setup guide:** `docs/SETUP_GUIDE.md`  
 **Workshop outline:** `docs/COMPLETE_WORKSHOP_OUTLINE.md`
+
+**Cost:** $0 Forever  
+**API Keys:** None Required  
+**Privacy:** 100% Local Processing

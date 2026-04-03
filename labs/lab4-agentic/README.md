@@ -1,13 +1,13 @@
 # Lab 4: Agentic Network Bot
 
-Build an autonomous AI agent that operates network devices.
+Build an autonomous AI agent that operates network devices using **100% free Ollama**.
 
 ## Overview
 
 This lab combines everything you've learned:
 - LLM fundamentals
 - Prompt engineering  
-- Tool calling
+- Tool calling (with structured prompts)
 - Conversation memory
 - Agentic reasoning
 
@@ -18,6 +18,8 @@ A complete AI agent that can:
 - Query multiple devices
 - Make multi-step decisions
 - Troubleshoot intelligently
+
+**All running locally with Ollama - no API keys required!**
 
 ## Mock Network Topology
 
@@ -39,12 +41,39 @@ spine2 (192.168.0.12) ─┘
 ## Running the Lab
 
 ```bash
-# Set API key
-export ANTHROPIC_API_KEY=your-key
-
-# Run the agent
-python3 agentic_network_bot.py
+# Ollama version (recommended - 100% free!)
+python3 agentic_network_bot_ollama.py
 ```
+
+## How It Works
+
+### Tool Calling with Ollama
+
+Since Ollama doesn't have native function calling, we use structured prompts:
+
+```
+User: "Check if leaf2 has any issues"
+
+↓
+
+LLM outputs:
+TOOL: get_device_status
+ARGS: {"device": "leaf2"}
+
+↓
+
+We parse and execute the tool
+
+↓
+
+Feed results back to LLM
+
+↓
+
+LLM decides: call another tool or answer
+```
+
+This achieves autonomous behavior without paid APIs!
 
 ## Example Queries
 
@@ -65,6 +94,8 @@ bot.chat("Something is wrong - investigate")
 
 - **Autonomous**: Agent decides which tools to call
 - **Multi-step**: Can call multiple tools to solve problems
+- **Local**: Everything runs on your laptop
+- **Free**: Zero cost forever
 - **Production-ready**: Same code works with real devices
 
 ## Production Migration
