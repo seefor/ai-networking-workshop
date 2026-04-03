@@ -44,7 +44,7 @@ layout: intro
 - **Duration:** 3.25 hours
 - **Format:** Theory + hands-on labs
 - **Goal:** Build production-ready AI agents for network automation
-- **Stack:** Python, Ollama (100% free), Mock Devices
+- **Stack:** Python, Anthropic Claude, Ollama, MCP
 
 </v-clicks>
 
@@ -90,13 +90,11 @@ Make sure you have these installed and working:
 
 ### Python Packages
 ```bash
-pip install requests
+pip install anthropic requests
 ```
 
-### Everything Uses Ollama - 100% Free!
-- ✅ No API keys required
-- ✅ No cloud services needed
-- ✅ Works offline after model download
+### Optional (for Claude labs)
+- Anthropic API key (~$5 credit)
 
 ### NOT Required
 - ❌ Docker Desktop
@@ -207,26 +205,23 @@ LLMs don't see words - they see **tokens** (sub-word chunks)
 Let's tokenize some network commands:
 
 ```python
-import requests
+from anthropic import Anthropic
+client = Anthropic()
 
-# Ollama API endpoint
-url = "http://localhost:11434/api/generate"
-
+# Count tokens
 text = """
 router bgp 65001
  neighbor 10.0.0.1 remote-as 65002
  neighbor 10.0.0.1 description CORE-RTR-01
 """
 
-response = requests.post(url, json={
-    "model": "llama3.2:3b",
-    "prompt": text,
-    "stream": False
-})
+response = client.messages.count_tokens(
+    model="claude-3-5-sonnet-20241022",
+    messages=[{"role": "user", "content": text}]
+)
 
-data = response.json()
-print(f"Prompt tokens: {data['prompt_eval_count']}")
-# Output: Tokens: ~45
+print(f"Tokens: {response.input_tokens}")
+# Output: Tokens: 47
 ```
 
 **Rule of thumb:** 1 token ≈ 0.75 words
@@ -373,19 +368,18 @@ Let's see temperature in action:
 prompt = "Generate a BGP configuration for AS 65001 with neighbor 10.0.0.1"
 
 # Temperature 0.0
-response = requests.post("http://localhost:11434/api/generate", json={
-    "model": "llama3.2:3b",
-    "prompt": prompt,
-    "stream": False,
-    "options": {"temperature": 0.0, "num_predict": 200}
-})
-
-print(response.json()["response"])
+response = client.messages.create(
+    model="claude-3-5-sonnet-20241022",
+    max_tokens=200,
+    temperature=0.0,
+    messages=[{"role": "user", "content": prompt}]
+)
+print(response.content[0].text)
 ```
 
 Run this 3 times - output should be **identical**
 
-Now try `"temperature": 1.5` - see the variation
+Now try `temperature=1.5` - see the variation
 
 </v-clicks>
 
@@ -1973,16 +1967,19 @@ Let's start simple:
 
 ```python
 # chatbot_v1.py
-import requests
+import anthropic
+
+client = anthropic.Anthropic()
 
 def simple_chat(user_message):
-    response = requests.post("http://localhost:11434/api/generate", json={
-        "model": "llama3.2:3b",
-        "prompt": user_message,
-        "stream": False,
-        "options": {"num_predict": 1024}
-    })
-    return response.json()["response"]
+    response = client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1024,
+        messages=[
+            {"role": "user", "content": user_message}
+        ]
+    )
+    return response.content[0].text
 
 # Test it
 print(simple_chat("What is OSPF?"))
@@ -2003,45 +2000,35 @@ Build a class to manage conversation state:
 
 ```python
 # chatbot_v2.py
-import requests
+import anthropic
 
 class NetworkChatbot:
     def __init__(self):
+        self.client = anthropic.Anthropic()
         self.conversation_history = []
-        self.system_prompt = "You are a network engineer assistant."
     
     def chat(self, user_message):
-        # Add to history
+        # Add user message to history
         self.conversation_history.append({
-            "role": "user", "content": user_message
+            "role": "user",
+            "content": user_message
         })
         
-        # Build prompt with history
-        prompt = self._build_prompt()
-        
-        # Call Ollama
-        response = requests.post("http://localhost:11434/api/generate", json={
-            "model": "llama3.2:3b",
-            "prompt": prompt,
-            "stream": False
-        })
+        # Call LLM with full history
+        response = self.client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            messages=self.conversation_history
+        )
         
         # Add assistant response to history
-        assistant_message = response.json()["response"]
+        assistant_message = response.content[0].text
         self.conversation_history.append({
-            "role": "assistant", "content": assistant_message
+            "role": "assistant",
+            "content": assistant_message
         })
         
         return assistant_message
-    
-    def _build_prompt(self):
-        # Combine system prompt + history
-        parts = [self.system_prompt, "\n\n"]
-        for msg in self.conversation_history:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            parts.append(f"{role}: {msg['content']}\n")
-        parts.append("Assistant: ")
-        return "".join(parts)
 ```
 
 </v-clicks>
@@ -2649,98 +2636,84 @@ TOOLS = [
 
 ---
 
-# Lab 4 - Part C: The Agentic Loop with Ollama
+# Lab 4 - Part C: The Agentic Loop
 
 <v-clicks>
 
-Since Ollama doesn't have native function calling, we use **structured prompts**:
-
 ```python
-# agentic_network_bot.py
-import requests
-from mock_network_devices import get_device_status, get_bgp_summary
+# agentic_chatbot.py
+import anthropic
+from tools import get_interface_status, get_bgp_neighbors, search_logs, execute_ping
+from tool_schemas import TOOLS
 
 class AgenticNetworkBot:
     def __init__(self):
+        self.client = anthropic.Anthropic()
         self.conversation_history = []
-        self.tools_map = {
-            "get_device_status": get_device_status,
-            "get_bgp_summary": get_bgp_summary,
-        }
         
-        # Tell LLM about available tools
-        self.system_prompt = """You are a network engineer.
-
-Available tools:
-- get_device_status(device) - Get device info
-- get_bgp_summary(device) - Get BGP neighbors
-
-When you need a tool, output:
-TOOL: tool_name
-ARGS: {"arg": "value"}
-"""
+        # Map tool names to functions
+        self.tool_functions = {
+            "get_interface_status": get_interface_status,
+            "get_bgp_neighbors": get_bgp_neighbors,
+            "search_logs": search_logs,
+            "execute_ping": execute_ping
+        }
     
-    def chat(self, user_message, max_iterations=5):
+    def chat(self, user_message):
+        # Add user message
         self.conversation_history.append({
-            "role": "user", "content": user_message
+            "role": "user",
+            "content": user_message
         })
         
-        for _ in range(max_iterations):
-            response = self._call_llm()
-            tool_call = self._parse_tool_call(response)
+        # Agentic loop: keep calling tools until LLM is done
+        while True:
+            response = self.client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2048,
+                tools=TOOLS,
+                messages=self.conversation_history
+            )
             
-            if tool_call:
-                # Execute the tool
-                result = self.tools_map[tool_call["name"]](**tool_call["args"])
+            # Check what LLM wants to do
+            if response.stop_reason == "end_turn":
+                # LLM has final answer
+                final_text = self._extract_text(response.content)
                 self.conversation_history.append({
-                    "role": "user",
-                    "content": f"Tool result: {json.dumps(result)}"
+                    "role": "assistant",
+                    "content": response.content
                 })
-            else:
-                # No tool call = final answer
-                return response
+                return final_text
 ```
 
 </v-clicks>
 
 ---
 
-# Tool Call Parsing
+# Agentic Loop (continued)
 
 <v-clicks>
 
 ```python
-def _parse_tool_call(self, response):
-    """Parse structured output from LLM"""
-    lines = response.split('\n')
-    tool_name = None
-    tool_args = {}
-    
-    for line in lines:
-        if line.startswith("TOOL:"):
-            tool_name = line.replace("TOOL:", "").strip()
-        elif line.startswith("ARGS:"):
-            args_str = line.replace("ARGS:", "").strip()
-            tool_args = json.loads(args_str)
-    
-    if tool_name and tool_name in self.tools_map:
-        return {"name": tool_name, "args": tool_args}
-    
-    return None  # No tool call found
-
-def _build_prompt(self):
-    """Build full prompt with system + history"""
-    parts = [self.system_prompt, "\n\n"]
-    for msg in self.conversation_history:
-        role = "User" if msg["role"] == "user" else "Assistant"
-        parts.append(f"{role}: {msg['content']}\n")
-    parts.append("Assistant: ")
-    return "".join(parts)
-```
-
-**Key Innovation:** Teach LLM to output structured commands!
-
-</v-clicks>
+            elif response.stop_reason == "tool_use":
+                # LLM wants to call tools
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": response.content
+                })
+                
+                # Execute all requested tools
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        print(f"🔧 Calling: {block.name}({block.input})")
+                        
+                        # Get the function
+                        tool_func = self.tool_functions[block.name]
+                        
+                        # Execute it
+                        try:
+                            result = tool_func(**block.input)
                         except Exception as e:
                             result = f"Error: {str(e)}"
                         
