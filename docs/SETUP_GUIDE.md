@@ -18,8 +18,13 @@ Complete setup instructions for the AI Networking Workshop.
 
 ### Optional
 
-- **Docker Desktop** (for future labs)
-- **Anthropic API key** (Labs 3-4, or use Ollama)
+- **llama3.1:8b model** (Better quality, but slower)
+
+**NOT Required:**
+- ❌ API keys
+- ❌ Docker Desktop  
+- ❌ Cloud accounts
+- ❌ Virtual machines
 
 ---
 

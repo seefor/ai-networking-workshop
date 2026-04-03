@@ -4130,15 +4130,13 @@ Results → LLM → Final answer → User
 ```python
 # chatbot_with_mcp.py
 import asyncio
-import requests
+from anthropic import Anthropic
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-import requests
 
 class MCPChatbot:
     def __init__(self):
-        self.ollama_url = "http://localhost:11434/api/generate"
-        self.model = "llama3.2:3b"
+        self.anthropic_client = Anthropic()
         self.conversation_history = []
         self.mcp_session = None
         self.available_tools = []
@@ -4162,8 +4160,6 @@ class MCPChatbot:
         
         print(f"✅ Connected to MCP server: {server_script_path}")
 ```
-
-**Note:** MCP integration is optional/advanced. Workshop focuses on Ollama basics.
 
 </v-clicks>
 
@@ -4219,20 +4215,34 @@ class MCPChatbot:
     async def chat(self, user_message):
         """Chat with MCP tool support"""
         
-        # Same agentic pattern as Lab 4!
-        # 1. Add user message to history
-        # 2. Call LLM with tools available
-        # 3. Parse tool calls (structured prompts)
-        # 4. Execute via MCP
-        # 5. Feed results back
-        # 6. Repeat until final answer
+        # Add user message
+        self.conversation_history.append({
+            "role": "user",
+            "content": user_message
+        })
         
-        # Implementation similar to agentic_network_bot.py
-        # but tools come from MCP server instead of local functions
+        # Agentic loop
+        while True:
+            # Call LLM with MCP tools
+            response = self.anthropic_client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=2048,
+                tools=self.available_tools,
+                messages=self.conversation_history
+            )
+            
+            if response.stop_reason == "end_turn":
+                # Final answer
+                final_text = next(
+                    (block.text for block in response.content if hasattr(block, "text")),
+                    None
+                )
+                self.conversation_history.append({
+                    "role": "assistant",
+                    "content": response.content
+                })
+                return final_text
 ```
-
-**Key Point:** MCP makes tools portable across different AI applications.  
-Same Ollama agent pattern, just with remote tool execution!
 
 </v-clicks>
 
