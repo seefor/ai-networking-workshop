@@ -1,21 +1,12 @@
 # AI Networking Workshop - Python Dependencies
 # Install with: pip install -r requirements.txt
 
-# Core LLM APIs
-anthropic>=0.40.0
+# 🎯 ALL LABS USE OLLAMA - 100% FREE, NO API KEYS REQUIRED!
 
-# HTTP requests
+# HTTP requests (for Ollama API)
 requests>=2.32.0
 
-# Environment variables
-python-dotenv>=1.0.0
+# Optional: Network automation (for production use only)
+# paramiko>=3.5.0
+# netmiko>=4.4.0
 
-# Optional: Network automation (for production use)
-paramiko>=3.5.0
-netmiko>=4.4.0
-
-# Optional: MCP development
-mcp>=1.0.0
-
-# Development
-pytest>=8.0.0

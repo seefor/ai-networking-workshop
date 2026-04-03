@@ -4,23 +4,17 @@ Lab 3 Part B: Stateful Chatbot with Memory
 Maintains conversation history for multi-turn conversations
 """
 
-import anthropic
-import os
+import requests
 import json
-from datetime import datetime
+from typing import List, Dict
 
 
 class NetworkChatbot:
     """Chatbot with conversation memory for network engineering."""
     
-    def __init__(self, api_key: str = None):
-        if api_key is None:
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError("Set ANTHROPIC_API_KEY environment variable")
-        
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.conversation_history = []
+    def __init__(self, model: str = "llama3.2:3b"):
+        self.model = model
+        self.conversation_history: List[Dict[str, str]] = []
         self.system_prompt = """You are a network engineer assistant.
 
 Available devices:
@@ -31,33 +25,70 @@ Provide accurate, concise answers about networking."""
     
     def chat(self, user_message: str) -> str:
         """Send message with full conversation history."""
+        # Add user message to history
         self.conversation_history.append({
             "role": "user",
             "content": user_message
         })
         
-        response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,
-            system=self.system_prompt,
-            messages=self.conversation_history
-        )
+        # Build full prompt with history
+        full_prompt = self._build_prompt()
         
-        assistant_message = response.content[0].text
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": assistant_message
-        })
+        # Call Ollama
+        url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": self.model,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.7,
+                "num_predict": 1024
+            }
+        }
         
-        return assistant_message
+        try:
+            response = requests.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+            data = response.json()
+            assistant_message = data.get("response", "")
+            
+            # Add assistant response to history
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": assistant_message
+            })
+            
+            return assistant_message
+            
+        except requests.exceptions.ConnectionError:
+            return "Error: Cannot connect to Ollama. Is it running? Try: ollama serve"
+        except Exception as e:
+            return f"Error: {e}"
+    
+    def _build_prompt(self) -> str:
+        """Build prompt with system message and conversation history."""
+        prompt_parts = [self.system_prompt, "\n\n"]
+        
+        for msg in self.conversation_history:
+            if msg["role"] == "user":
+                prompt_parts.append(f"User: {msg['content']}\n")
+            elif msg["role"] == "assistant":
+                prompt_parts.append(f"Assistant: {msg['content']}\n")
+        
+        prompt_parts.append("Assistant: ")
+        return "".join(prompt_parts)
     
     def reset(self):
         """Clear conversation history."""
         self.conversation_history = []
+    
+    def get_history_length(self) -> int:
+        """Get number of messages in history."""
+        return len(self.conversation_history)
 
 
 if __name__ == "__main__":
-    print("🤖 Stateful Chatbot Demo")
+    print("🤖 Stateful Chatbot Demo (Ollama)")
     print("="*70)
     
     bot = NetworkChatbot()
@@ -71,4 +102,33 @@ if __name__ == "__main__":
     print(f"🤖 Bot: {response2}\n")
     
     print("✅ SUCCESS: The bot remembers!")
-    print(f"   Conversation length: {len(bot.conversation_history)} messages")
+    print(f"   Conversation length: {bot.get_history_length()} messages")
+    
+    # Interactive mode
+    print("\n" + "="*70)
+    print("💬 Interactive Mode - Type 'quit' to exit, 'reset' to clear history")
+    print("="*70)
+    
+    while True:
+        try:
+            user_input = input("\n👤 You: ").strip()
+            
+            if user_input.lower() in ['quit', 'exit', 'q']:
+                print("👋 Goodbye!")
+                break
+            
+            if user_input.lower() == 'reset':
+                bot.reset()
+                print("🔄 Conversation history cleared!")
+                continue
+            
+            if not user_input:
+                continue
+            
+            response = bot.chat(user_input)
+            print(f"\n🤖 Bot: {response}")
+            print(f"   [{bot.get_history_length()} messages in history]")
+            
+        except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
+            break
