@@ -16,7 +16,35 @@ P.E.N.E. Framework:
 import json
 import re
 import requests
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+
+# ============================================================================
+# JSON Schema
+# ============================================================================
+
+INTERFACE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "interface": {"type": "string"},
+        "admin_status": {"type": "string", "enum": ["up", "down"]},
+        "oper_status": {"type": "string", "enum": ["up", "down"]},
+        "ip_address": {"type": ["string", "null"]},
+        "prefix_length": {"type": ["integer", "null"]},
+        "mac_address": {"type": ["string", "null"]},
+        "mtu": {"type": ["integer", "null"]},
+    },
+    "required": [
+        "interface",
+        "admin_status",
+        "oper_status",
+        "ip_address",
+        "prefix_length",
+        "mac_address",
+        "mtu",
+    ],
+    "additionalProperties": False,
+}
 
 
 # ============================================================================
@@ -26,16 +54,22 @@ from typing import Any, Dict, Optional
 def call_llm(
     prompt: str,
     model: str = "llama3.2:3b",
-    temperature: float = 0.3,
-    timeout: int = 60
+    temperature: float = 0.0,
+    timeout: int = 60,
+    response_format: Optional[Union[str, Dict[str, Any]]] = None,
 ) -> str:
     """
     Call the local Ollama API with a prompt.
+
+    response_format can be:
+    - None: normal free-form text output
+    - "json": Ollama JSON mode
+    - JSON schema dict: stronger structured output
     """
 
     url = "http://localhost:11434/api/generate"
 
-    payload = {
+    payload: Dict[str, Any] = {
         "model": model,
         "prompt": prompt,
         "stream": False,
@@ -43,6 +77,12 @@ def call_llm(
             "temperature": temperature
         }
     }
+
+    # This is the important fix.
+    # It tells Ollama to constrain the model output instead of relying only on
+    # prompt wording.
+    if response_format is not None:
+        payload["format"] = response_format
 
     try:
         response = requests.post(url, json=payload, timeout=timeout)
@@ -82,24 +122,29 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
     cleaned = text.strip()
 
     # Remove markdown code fences if present
-    cleaned = re.sub(r"^```json\s*", "", cleaned)
-    cleaned = re.sub(r"^```\s*", "", cleaned)
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
     cleaned = re.sub(r"\s*```$", "", cleaned)
 
     # Try direct JSON parsing first
     try:
-        return json.loads(cleaned)
+        parsed = json.loads(cleaned)
+        return parsed if isinstance(parsed, dict) else None
     except json.JSONDecodeError:
         pass
 
-    # Try to extract the first JSON object from the response
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    # More reliable than a greedy regex.
+    # Scan for a JSON object and decode from that point.
+    decoder = json.JSONDecoder()
 
-    if match:
+    for index, character in enumerate(cleaned):
+        if character != "{":
+            continue
+
         try:
-            return json.loads(match.group(0))
+            parsed, _ = decoder.raw_decode(cleaned[index:])
+            return parsed if isinstance(parsed, dict) else None
         except json.JSONDecodeError:
-            return None
+            continue
 
     return None
 
@@ -158,26 +203,36 @@ def good_config_parser_prompt(config_text: str) -> str:
     """
     GOOD EXAMPLE:
     Uses the P.E.N.E. framework to create a structured prompt.
+
+    This version is intentionally strict because smaller local models can
+    sometimes drift into writing Python code unless we explicitly forbid it.
     """
 
+    schema_text = json.dumps(INTERFACE_SCHEMA, indent=2)
+
     return f"""
-You are a network automation engineer building a device inventory system.
+You are a JSON extraction engine for network automation data.
+
+PERSONA & PURPOSE:
+You extract facts from network interface CLI output so another automation
+workflow can consume the result.
 
 TASK:
-Parse network interface output and extract key fields as structured JSON.
+Read the network interface output and return the extracted values as JSON.
 
-OUTPUT FORMAT:
-Return ONLY valid JSON using this schema:
+CRITICAL OUTPUT RULES:
+- Return one JSON object only.
+- Do not write Python code.
+- Do not write a parser function.
+- Do not use markdown code fences.
+- Do not explain your answer.
+- The first character of your answer must be {{.
+- The last character of your answer must be }}.
+- Use null for missing values.
+- Do not invent values that are not present in the input.
 
-{{
-  "interface": "string",
-  "admin_status": "up|down",
-  "oper_status": "up|down",
-  "ip_address": "string|null",
-  "prefix_length": "integer|null",
-  "mac_address": "string|null",
-  "mtu": "integer|null"
-}}
+JSON SCHEMA:
+{schema_text}
 
 EXAMPLE INPUT:
 GigabitEthernet0/1 is up, line protocol is up
@@ -196,21 +251,8 @@ EXAMPLE OUTPUT:
   "mtu": 1500
 }}
 
-CONSTRAINTS:
-- Return ONLY valid JSON
-- Do not include markdown fences
-- Do not include explanations
-- If a field is missing, use null
-- admin_status must be either "up" or "down"
-- oper_status must be either "up" or "down"
-- Do not invent values that are not present in the input
-- If an IP address includes CIDR notation, split it into ip_address and prefix_length
-
 NOW PARSE THIS CONFIG:
-
 {config_text}
-
-JSON OUTPUT:
 """.strip()
 
 
@@ -238,7 +280,10 @@ GigabitEthernet0/2 is down, line protocol is down
     bad_prompt = bad_config_parser_prompt()
     print(f"Prompt:\n{bad_prompt}")
 
-    bad_result = call_llm(f"{bad_prompt}\n\n{test_config}")
+    bad_result = call_llm(
+        prompt=f"{bad_prompt}\n\n{test_config}",
+        temperature=0.7,
+    )
 
     print("\nLLM Result:")
     print(bad_result[:500])
@@ -253,7 +298,11 @@ GigabitEthernet0/2 is down, line protocol is down
     good_prompt = good_config_parser_prompt(test_config)
     print(f"Prompt length: {len(good_prompt)} characters")
 
-    good_result = call_llm(good_prompt)
+    good_result = call_llm(
+        prompt=good_prompt,
+        temperature=0.0,
+        response_format=INTERFACE_SCHEMA,
+    )
 
     print("\nLLM Result:")
     print(good_result)
@@ -315,7 +364,7 @@ if __name__ == "__main__":
     print("1. BAD: 'Parse this config' creates inconsistent results.")
     print("2. GOOD: P.E.N.E. prompts give the model role, task, examples, and constraints.")
     print("3. Examples are often more powerful than instructions alone.")
-    print("4. Automation needs structured output, not pretty paragraphs.")
+    print("4. Automation needs structured output, not pretty paragraphs or Python code.")
     print("5. Always validate LLM output before using it in a workflow.")
-    print("6. Lower temperature helps with predictable structured output.")
+    print("6. Lower temperature plus Ollama structured output gives more predictable results.")
     print("=" * 70)
