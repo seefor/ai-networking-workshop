@@ -1,0 +1,40 @@
+! --- Filter for Inbound Safety ---
+ip prefix-list PL-DENY-BOGON-IN seq 5 permit 0.0.0.0/0
+ip prefix-list PL-DENY-BOGON-IN seq 10 permit 10.0.0.0/8 ge 8
+ip prefix-list PL-DENY-BOGON-IN seq 15 permit 172.16.0.0/12 ge 12
+ip prefix-list PL-DENY-BOGON-IN seq 20 permit 192.168.0.0/16 ge 16
+
+route-map RM-EBGP-PEER-IN deny 10
+ description Filter Default and Private space
+ match ip address prefix-list PL-DENY-BOGON-IN
+!
+route-map RM-EBGP-PEER-IN permit 100
+ description Permit and tag Peer traffic
+ set community <LOCAL_AS>:100 additive
+router bgp 65000
+ bgp log-neighbor-changes
+ 
+ ! --- Session Parameters (Layer 4 Security) ---
+ template peer-session T-EBGP-AUTH
+  password 7 0822455D0A16  ! Replace with your encrypted or cleartext password
+  timers 30 90
+ exit-peer-session
+
+ ! --- Policy Parameters (Routing Logic & Limits) ---
+ template peer-policy T-EBGP-LIMITS
+  route-map RM-EBGP-PEER-IN in
+  ! Max prefixes: 1000 limit, 80% warning, auto-restart after 15 mins
+  maximum-prefix 1000 80 restart 15
+  send-community both
+ exit-peer-policy
+router bgp 65000
+ ! -- Define the Neighbor --
+ neighbor 192.0.2.1 remote-as 65111
+ neighbor 192.0.2.1 inherit peer-session T-EBGP-AUTH
+ 
+ ! -- Address-Family Activation --
+ address-family ipv4 unicast
+  neighbor 192.0.2.1 activate
+  neighbor 192.0.2.1 inherit peer-policy T-EBGP-LIMITS
+  neighbor 192.0.2.1 soft-reconfiguration inbound
+ exit-address-family

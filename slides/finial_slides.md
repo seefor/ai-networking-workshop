@@ -90,7 +90,7 @@ Make sure you have these installed and working:
 
 ### Python Packages
 ```bash
-pip install anthropic openai mcp flask streamlit
+pip install requests openai mcp flask streamlit
 ```
 
 ### Optional (for demos)
@@ -201,23 +201,23 @@ LLMs don't see words - they see **tokens** (sub-word chunks)
 Let's tokenize some network commands:
 
 ```python
-from anthropic import Anthropic
-client = Anthropic()
+import requests
 
-# Count tokens
+# Count tokens via Ollama's generate endpoint
 text = """
 router bgp 65001
  neighbor 10.0.0.1 remote-as 65002
  neighbor 10.0.0.1 description CORE-RTR-01
 """
 
-response = client.messages.count_tokens(
-    model="claude-3-5-sonnet-20241022",
-    messages=[{"role": "user", "content": text}]
-)
+response = requests.post("http://localhost:11434/api/generate", json={
+    "model": "llama3.2:3b",
+    "prompt": text,
+    "stream": False
+}).json()
 
-print(f"Tokens: {response.input_tokens}")
-# Output: Tokens: 47
+print(f"Prompt tokens: {response['prompt_eval_count']}")
+# Output: Prompt tokens: ~47
 ```
 
 **Rule of thumb:** 1 token ≈ 0.75 words
@@ -345,7 +345,6 @@ Your conversation:
    summary = summarize(history[:-5])
    history = [summary] + history[-5:]
    ```
-
 3. **Use RAG (Retrieval Augmented Generation)**
    - Store full history in vector DB
    - Retrieve only relevant context for each message
@@ -361,16 +360,18 @@ Let's see temperature in action:
 <v-clicks>
 
 ```python
+import requests
+
 prompt = "Generate a BGP configuration for AS 65001 with neighbor 10.0.0.1"
 
 # Temperature 0.0
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=200,
-    temperature=0.0,
-    messages=[{"role": "user", "content": prompt}]
-)
-print(response.content[0].text)
+response = requests.post("http://localhost:11434/api/generate", json={
+    "model": "llama3.2:3b",
+    "prompt": prompt,
+    "stream": False,
+    "options": {"temperature": 0.0, "num_predict": 200}
+}).json()
+print(response["response"])
 ```
 
 Run this 3 times - output should be **identical**
@@ -1451,27 +1452,26 @@ class: text-center
 ## How API Calls Work
 
 ```python
-import anthropic
+import requests
 
-client = anthropic.Anthropic(api_key="sk-ant-...")
+def call_ollama(prompt, model="llama3.2:3b", temperature=0.7):
+    response = requests.post("http://localhost:11434/api/generate", json={
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": temperature}
+    })
+    return response.json()["response"]
 
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    messages=[
-        {"role": "user", "content": "What is BGP?"}
-    ]
-)
-
-print(response.content[0].text)
+print(call_ollama("What is BGP?"))
 ```
 
 ### Key Components
-- **Authentication**: API key identifies you
-- **Model selection**: Which LLM to use
-- **Messages**: Conversation history
-- **Parameters**: Temperature, max_tokens, etc.
-- **Response**: Text + metadata (tokens used, stop reason)
+- **No API key needed** — Ollama runs locally
+- **Model selection**: Which LLM to use (llama3.2:3b, etc.)
+- **Prompt**: The input text
+- **Parameters**: Temperature, num_predict, etc.
+- **Response**: Text + metadata (tokens used, duration)
 
 </v-clicks>
 
@@ -1481,29 +1481,31 @@ print(response.content[0].text)
 
 <v-clicks>
 
-## Pricing (Claude 3.5 Sonnet)
+## Pricing with Ollama
 
-- **Input:** $3 per million tokens
-- **Output:** $15 per million tokens
+- **Cost:** $0 — runs 100% locally on your machine
+- **No rate limits, no billing surprises**
+- **Data stays on-prem** — nothing leaves your network
 
 ### Example
 
 ```python
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=500,
-    messages=[
-        {"role": "user", "content": "Parse this 2000-word config file..."}
-    ]
-)
+import requests
+
+response = requests.post("http://localhost:11434/api/generate", json={
+    "model": "llama3.2:3b",
+    "prompt": "Parse this 2000-word config file...",
+    "stream": False,
+    "options": {"num_predict": 500}
+}).json()
 
 # Cost breakdown:
-# Input: 2500 tokens = $0.0075
-# Output: 300 tokens = $0.0045
-# Total: $0.012 per API call
+# Input: 2500 tokens = $0.00
+# Output: 300 tokens = $0.00
+# Total: $0.00 per API call
 ```
 
-**At scale:** 10k calls/day = $120/day = $3,600/month
+**At scale:** 10k calls/day = **$0/month** (just your GPU/CPU time)
 
 </v-clicks>
 
@@ -1610,34 +1612,33 @@ tools = [
 <v-clicks>
 
 ```python
-import anthropic
+import requests
 
-client = anthropic.Anthropic()
-
-# Define tools
+# Define tools (Ollama uses OpenAI-compatible format)
 tools = [
     {
-        "name": "get_device_status",
-        "description": "Get operational status of a network device",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "device_name": {"type": "string"}
-            },
-            "required": ["device_name"]
+        "type": "function",
+        "function": {
+            "name": "get_device_status",
+            "description": "Get operational status of a network device",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "device_name": {"type": "string"}
+                },
+                "required": ["device_name"]
+            }
         }
     }
 ]
 
 # Make API call with tools
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    tools=tools,
-    messages=[
-        {"role": "user", "content": "Check status of RTR-CORE-01"}
-    ]
-)
+response = requests.post("http://localhost:11434/api/chat", json={
+    "model": "llama3.2:3b",
+    "messages": [{"role": "user", "content": "Check status of RTR-CORE-01"}],
+    "tools": tools,
+    "stream": False
+}).json()
 ```
 
 </v-clicks>
@@ -1649,26 +1650,24 @@ response = client.messages.create(
 <v-clicks>
 
 ```python
-# LLM returns tool_use block
-if response.stop_reason == "tool_use":
-    # Extract tool call
-    tool_use = next(
-        block for block in response.content 
-        if block.type == "tool_use"
-    )
-    
-    print(f"LLM wants to call: {tool_use.name}")
-    print(f"With arguments: {tool_use.input}")
+# LLM returns tool_calls in the message
+msg = response["message"]
+tool_calls = msg.get("tool_calls") or []
+
+if tool_calls:
+    tc = tool_calls[0]["function"]
+    print(f"LLM wants to call: {tc['name']}")
+    print(f"With arguments: {tc['arguments']}")
     # Output:
     # LLM wants to call: get_device_status
     # With arguments: {'device_name': 'RTR-CORE-01'}
-    
+
     # Execute the function (YOUR CODE)
     def get_device_status(device_name):
         # SSH to device, run 'show' commands
         return {"status": "up", "bgp_peers": "4/4 established"}
-    
-    result = get_device_status(**tool_use.input)
+
+    result = get_device_status(**tc["arguments"])
 ```
 
 </v-clicks>
@@ -1680,33 +1679,26 @@ if response.stop_reason == "tool_use":
 <v-clicks>
 
 ```python
+import json
+
 # Send tool result back to LLM
 messages = [
     {"role": "user", "content": "Check status of RTR-CORE-01"},
-    {"role": "assistant", "content": response.content},
-    {
-        "role": "user",
-        "content": [
-            {
-                "type": "tool_result",
-                "tool_use_id": tool_use.id,
-                "content": json.dumps(result)
-            }
-        ]
-    }
+    msg,  # assistant message with tool_calls
+    {"role": "tool", "content": json.dumps(result)},
 ]
 
 # LLM processes result and generates final answer
-final_response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    tools=tools,
-    messages=messages
-)
+final_response = requests.post("http://localhost:11434/api/chat", json={
+    "model": "llama3.2:3b",
+    "messages": messages,
+    "tools": tools,
+    "stream": False
+}).json()
 
-print(final_response.content[0].text)
+print(final_response["message"]["content"])
 # Output:
-# "Router RTR-CORE-01 is operational and all 4 BGP peers 
+# "Router RTR-CORE-01 is operational and all 4 BGP peers
 #  are in established state."
 ```
 
@@ -1775,12 +1767,12 @@ tools = [{
 }]
 
 # Test it
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    tools=tools,
-    messages=[{"role": "user", "content": "Check Gi0/1 on RTR-01"}]
-)
+response = requests.post("http://localhost:11434/api/chat", json={
+    "model": "llama3.2:3b",
+    "messages": [{"role": "user", "content": "Check Gi0/1 on RTR-01"}],
+    "tools": tools,
+    "stream": False
+}).json()
 ```
 
 </v-clicks>
@@ -1963,19 +1955,15 @@ Let's start simple:
 
 ```python
 # chatbot_v1.py
-import anthropic
+import requests
 
-client = anthropic.Anthropic()
-
-def simple_chat(user_message):
-    response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=1024,
-        messages=[
-            {"role": "user", "content": user_message}
-        ]
-    )
-    return response.content[0].text
+def simple_chat(user_message, model="llama3.2:3b"):
+    response = requests.post("http://localhost:11434/api/generate", json={
+        "model": model,
+        "prompt": user_message,
+        "stream": False
+    })
+    return response.json()["response"]
 
 # Test it
 print(simple_chat("What is OSPF?"))
@@ -1996,34 +1984,38 @@ Build a class to manage conversation state:
 
 ```python
 # chatbot_v2.py
-import anthropic
+import requests
 
 class NetworkChatbot:
-    def __init__(self):
-        self.client = anthropic.Anthropic()
+    def __init__(self, model="llama3.2:3b"):
+        self.model = model
         self.conversation_history = []
-    
+
     def chat(self, user_message):
         # Add user message to history
         self.conversation_history.append({
             "role": "user",
             "content": user_message
         })
-        
-        # Call LLM with full history
-        response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=self.conversation_history
-        )
-        
-        # Add assistant response to history
-        assistant_message = response.content[0].text
+
+        # Build a single prompt from history
+        full_prompt = "\n".join(
+            f"{m['role'].capitalize()}: {m['content']}"
+            for m in self.conversation_history
+        ) + "\nAssistant:"
+
+        # Call Ollama with full history
+        response = requests.post("http://localhost:11434/api/generate", json={
+            "model": self.model,
+            "prompt": full_prompt,
+            "stream": False
+        })
+        assistant_message = response.json()["response"].strip()
+
         self.conversation_history.append({
             "role": "assistant",
             "content": assistant_message
         })
-        
         return assistant_message
 ```
 
@@ -2118,8 +2110,8 @@ bot.token_count()  # Output: 125,000 tokens
 
 ```python
 class NetworkChatbot:
-    def __init__(self, max_messages=20):
-        self.client = anthropic.Anthropic()
+    def __init__(self, model="llama3.2:3b", max_messages=20):
+        self.model = model
         self.conversation_history = []
         self.max_messages = max_messages
     
@@ -2517,49 +2509,43 @@ TOOLS = [
 <v-clicks>
 
 ```python
-# agentic_chatbot.py
-import anthropic
+# agentic_chatbot.py  (see agentic_network_bot.py for full code)
+import requests, json
 from tools import get_interface_status, get_bgp_neighbors, search_logs, execute_ping
-from tool_schemas import TOOLS
+from tool_schemas import TOOLS  # Ollama/OpenAI-compatible format
 
 class AgenticNetworkBot:
-    def __init__(self):
-        self.client = anthropic.Anthropic()
+    def __init__(self, model="llama3.2:3b"):
+        self.model = model
         self.conversation_history = []
-        
-        # Map tool names to functions
         self.tool_functions = {
             "get_interface_status": get_interface_status,
             "get_bgp_neighbors": get_bgp_neighbors,
             "search_logs": search_logs,
             "execute_ping": execute_ping
         }
-    
+
     def chat(self, user_message):
-        # Add user message
         self.conversation_history.append({
-            "role": "user",
-            "content": user_message
+            "role": "user", "content": user_message
         })
-        
+
         # Agentic loop: keep calling tools until LLM is done
         while True:
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2048,
-                tools=TOOLS,
-                messages=self.conversation_history
-            )
-            
-            # Check what LLM wants to do
-            if response.stop_reason == "end_turn":
+            response = requests.post("http://localhost:11434/api/chat", json={
+                "model": self.model,
+                "messages": self.conversation_history,
+                "tools": TOOLS,
+                "stream": False
+            }).json()
+
+            msg = response["message"]
+            tool_calls = msg.get("tool_calls") or []
+
+            if not tool_calls:
                 # LLM has final answer
-                final_text = self._extract_text(response.content)
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-                return final_text
+                self.conversation_history.append(msg)
+                return msg.get("content", "")
 ```
 
 </v-clicks>
@@ -2571,12 +2557,9 @@ class AgenticNetworkBot:
 <v-clicks>
 
 ```python
-            elif response.stop_reason == "tool_use":
+            if tool_calls:
                 # LLM wants to call tools
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
+                self.conversation_history.append(msg)
                 
                 # Execute all requested tools
                 tool_results = []
@@ -3292,7 +3275,7 @@ touch server.py tools.py resources.py
 ### Install Dependencies
 
 ```bash
-pip install anthropic-mcp paramiko netmiko
+pip install mcp paramiko netmiko
 ```
 
 **Note:** For the lab, we'll use mock data. In production, add:
@@ -3958,14 +3941,15 @@ Results → LLM → Final answer → User
 
 ```python
 # chatbot_with_mcp.py
-import asyncio
-from anthropic import Anthropic
+import asyncio, requests
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+OLLAMA_URL = "http://localhost:11434/api/chat"
+MODEL = "llama3.2:3b"
+
 class MCPChatbot:
     def __init__(self):
-        self.anthropic_client = Anthropic()
         self.conversation_history = []
         self.mcp_session = None
         self.available_tools = []
@@ -4043,34 +4027,30 @@ class MCPChatbot:
 ```python
     async def chat(self, user_message):
         """Chat with MCP tool support"""
-        
+
         # Add user message
         self.conversation_history.append({
             "role": "user",
             "content": user_message
         })
-        
+
         # Agentic loop
         while True:
-            # Call LLM with MCP tools
-            response = self.anthropic_client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2048,
-                tools=self.available_tools,
-                messages=self.conversation_history
-            )
-            
-            if response.stop_reason == "end_turn":
+            # Call Ollama with MCP tools
+            response = requests.post(OLLAMA_URL, json={
+                "model": MODEL,
+                "messages": self.conversation_history,
+                "tools": self.available_tools,
+                "stream": False
+            }).json()
+
+            msg = response["message"]
+            tool_calls = msg.get("tool_calls") or []
+
+            if not tool_calls:
                 # Final answer
-                final_text = next(
-                    (block.text for block in response.content if hasattr(block, "text")),
-                    None
-                )
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-                return final_text
+                self.conversation_history.append(msg)
+                return msg.get("content", "")
 ```
 
 </v-clicks>
@@ -4082,12 +4062,9 @@ class MCPChatbot:
 <v-clicks>
 
 ```python
-            elif response.stop_reason == "tool_use":
+            if tool_calls:
                 # LLM wants to call MCP tools
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
+                self.conversation_history.append(msg)
                 
                 # Execute each tool via MCP
                 tool_results = []
@@ -4226,3 +4203,431 @@ if __name__ == "__main__":
 </v-clicks>
 
 ---
+---
+layout: section
+---
+
+# Module 6: Production Deployment
+
+Moving from Workshop to Real Networks
+
+---
+
+# Production Migration Path
+
+<v-clicks>
+
+## Workshop → Production
+
+**Mock Devices (Workshop):**
+```python
+from examples.mock_network_devices import get_device_status
+
+status = get_device_status("spine1")
+```
+
+**Real Devices (Production):**
+```python
+import paramiko
+
+def get_device_status(device_ip):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(device_ip, username="admin", password=...)
+    
+    stdin, stdout, stderr = ssh.exec_command("show version | json")
+    result = json.loads(stdout.read())
+    ssh.close()
+    return result
+```
+
+**Your agent code stays the same!** Just swap the backend function.
+
+</v-clicks>
+
+---
+
+# Production Best Practices
+
+<v-clicks>
+
+## Error Handling
+
+```python
+def get_device_status(device, retries=3):
+    for attempt in range(retries):
+        try:
+            # SSH connection
+            result = execute_ssh_command(device, "show version")
+            return result
+        except paramiko.SSHException as e:
+            if attempt < retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+            else:
+                return {"error": f"SSH failed after {retries} attempts: {e}"}
+        except Exception as e:
+            return {"error": f"Unexpected error: {e}"}
+```
+
+**Always:**
+- Implement retries with backoff
+- Handle SSH exceptions gracefully
+- Log all errors
+- Return structured error responses
+
+</v-clicks>
+
+---
+
+# Security Considerations
+
+<v-clicks>
+
+## Credential Management
+
+**❌ Never do this:**
+```python
+password = "admin123"  # Hardcoded!
+```
+
+**✅ Do this:**
+```python
+import os
+from getpass import getpass
+
+# Environment variables
+username = os.getenv("NETWORK_USERNAME")
+password = os.getenv("NETWORK_PASSWORD")
+
+# Or use a secrets manager
+from vault_client import get_secret
+credentials = get_secret("network/credentials")
+```
+
+**Best practices:**
+- Use SSH keys instead of passwords
+- Leverage secrets management (HashiCorp Vault, AWS Secrets Manager)
+- Implement role-based access control (RBAC)
+- Audit all network operations
+
+</v-clicks>
+
+---
+
+# Scaling Your Agent
+
+<v-clicks>
+
+## From Single Device to Fleet
+
+**Sequential (Slow):**
+```python
+results = []
+for device in devices:
+    status = get_device_status(device)
+    results.append(status)
+```
+
+**Parallel (Fast):**
+```python
+import asyncio
+
+async def check_all_devices(devices):
+    tasks = [check_device(device) for device in devices]
+    return await asyncio.gather(*tasks)
+
+# Check 100 devices in parallel
+results = asyncio.run(check_all_devices(device_list))
+```
+
+**Key benefit:** Check entire data center in seconds instead of minutes
+
+</v-clicks>
+
+---
+
+# Testing Scenarios
+
+<v-clicks>
+
+## Test Your Agent Like Production
+
+**Scenario 1: Network Partition**
+```python
+# Simulate: Half of devices unreachable
+mock_unreachable = ["spine1", "leaf1"]
+```
+
+**Scenario 2: Partial Failures**
+```python
+# Simulate: Some commands timeout
+mock_slow_devices = {"leaf2": 5.0}  # 5 second delay
+```
+
+**Scenario 3: Bad Data**
+```python
+# Simulate: Malformed responses
+mock_corrupted_output = {"device": "leaf3", "corrupt": True}
+```
+
+**Always test:**
+- Network failures
+- Timeouts and retries
+- Malformed data
+- Edge cases
+
+</v-clicks>
+
+---
+
+# Observability
+
+<v-clicks>
+
+## Monitor Your Agent
+
+```python
+import logging
+import prometheus_client as prom
+
+# Metrics
+tool_calls = prom.Counter('agent_tool_calls_total', 
+                          'Total tool calls', 
+                          ['tool_name', 'status'])
+tool_duration = prom.Histogram('agent_tool_duration_seconds',
+                               'Tool execution time')
+
+class MonitoredAgent:
+    @tool_duration.time()
+    def execute_tool(self, tool_name, args):
+        try:
+            result = self.tools[tool_name](**args)
+            tool_calls.labels(tool_name=tool_name, status='success').inc()
+            return result
+        except Exception as e:
+            tool_calls.labels(tool_name=tool_name, status='error').inc()
+            logging.error(f"Tool {tool_name} failed: {e}")
+            raise
+```
+
+**Track:**
+- Tool call frequency
+- Success/failure rates
+- Response times
+- Error patterns
+
+</v-clicks>
+
+---
+layout: section
+---
+
+# Wrap-Up & Next Steps
+
+What You've Learned & Where to Go
+
+---
+
+# What We Covered Today
+
+<v-clicks>
+
+## Module 1: LLM Fundamentals
+- Tokenization and context windows
+- Temperature and sampling
+- Why local models work great
+
+## Module 2: Prompt Engineering
+- P.E.N.E. framework
+- Production prompt patterns
+- Systematic iteration
+
+## Module 3: LLM APIs
+- Ollama API basics
+- Building conversation memory
+- Managing context
+
+## Module 4: Agentic Patterns
+- Tool calling with structured prompts
+- Multi-step reasoning
+- Autonomous troubleshooting
+
+## Module 5: MCP Integration (Optional)
+- Tool standardization
+- Cross-application reuse
+
+## Module 6: Production Path
+- Migration strategy
+- Best practices
+- Scaling and observability
+
+</v-clicks>
+
+---
+
+# Key Takeaways
+
+<v-clicks>
+
+## 1. 100% Free with Ollama
+- No API keys required
+- Runs entirely on your laptop
+- Privacy-first architecture
+
+## 2. Agents Are Code + LLM + Tools
+```
+Agent = Code Logic + LLM Reasoning + Tool Execution
+```
+
+## 3. Start Simple, Then Scale
+- Begin with mock devices
+- Test thoroughly
+- Migrate to production incrementally
+
+## 4. Tool Calling is Just Structured Prompts
+- LLM outputs commands
+- You parse and execute
+- Feed results back
+- **You understand the full loop!**
+
+## 5. The Pattern Works Everywhere
+- Same code works with any LLM
+- Swap Ollama → Claude → GPT with 1 line
+- Patterns are universal
+
+</v-clicks>
+
+---
+
+# Your Next Steps
+
+<v-clicks>
+
+## Immediate (This Week)
+
+1. **Run all 4 labs** on your network topology
+2. **Customize tools** for your environment
+3. **Test edge cases** (failures, timeouts)
+4. **Deploy to dev network** (non-production)
+
+## Short Term (This Month)
+
+1. **Add more tools** (config generation, compliance checks)
+2. **Implement logging** and observability
+3. **Build test suite** with real scenarios
+4. **Document your agent** for teammates
+
+## Long Term (This Quarter)
+
+1. **Production deployment** with proper auth
+2. **Multi-agent orchestration** (different specialists)
+3. **Integration with SOAR** platforms
+4. **Share your learnings** with the community
+
+</v-clicks>
+
+---
+
+# Resources
+
+<v-clicks>
+
+## Workshop Materials
+
+- **GitHub:** github.com/sifbaksh/ai-networking-workshop
+- **Full slides:** Available in repo
+- **All lab code:** 100% free with Ollama
+- **Mock devices:** Included
+
+## Ollama
+
+- **Docs:** ollama.com/docs
+- **Models:** ollama.com/library
+- **Discord:** ollama.com/discord
+
+## Further Learning
+
+- **LangChain:** langchain.com (multi-agent frameworks)
+- **MCP:** modelcontextprotocol.io
+- **Network Automation:** networktocode.com
+- **Nornir:** nornir.tech
+
+## Follow Along
+
+- **Blog:** sifbaksh.com
+- **LinkedIn:** linkedin.com/in/sifbaksh
+
+</v-clicks>
+
+---
+
+# Common Questions
+
+<v-clicks>
+
+**Q: Can I use Claude/GPT instead of Ollama?**  
+A: Yes! Same patterns work. Just swap the API client (1 line change).
+
+**Q: How do I handle authentication?**  
+A: SSH keys + secrets manager (Vault, AWS Secrets). Never hardcode credentials.
+
+**Q: What about network devices without APIs?**  
+A: Screen scraping with Netmiko/Paramiko + regex parsing. Works fine!
+
+**Q: Can agents modify configurations?**  
+A: Yes, but implement approval workflows. Never let agents auto-commit changes.
+
+**Q: How do I prevent agents from breaking things?**  
+A: Read-only tools first. Test extensively. Require human approval for writes.
+
+**Q: What about rate limiting?**  
+A: Ollama has no limits. For paid APIs, implement request queuing.
+
+**Q: Can multiple agents work together?**  
+A: Yes! Use message passing or shared state (Redis, database).
+
+</v-clicks>
+
+---
+layout: center
+class: text-center
+---
+
+# Thank You! 🎉
+
+<div class="text-2xl mt-8">
+  Questions?
+</div>
+
+<div class="mt-12 text-lg opacity-75">
+  <p>Workshop: AI Networking - From LLMs to Production Agents</p>
+  <p class="text-sm mt-4">100% Free with Ollama | No API Keys Required</p>
+  <p class="text-sm">All materials: github.com/sifbaksh/ai-networking-workshop</p>
+</div>
+
+<div class="mt-12">
+  <p class="text-sm">Created by Sif Baksh | March 31, 2026</p>
+  <p class="text-sm">sifbaksh.com | @sifbaksh</p>
+</div>
+
+---
+layout: center
+class: text-center
+---
+
+# 🎊 Congratulations! 🎊
+
+<div class="text-3xl font-bold mt-12">
+You're Now an AI Agent Builder!
+</div>
+
+<div class="text-xl mt-8 opacity-75">
+Go build something amazing! 🚀
+</div>
+
+<div class="mt-12 text-sm">
+📧 Questions? Reach out anytime!<br>
+💬 Share what you build - we'd love to see it!<br>
+⭐ Star the repo if this was helpful!
+</div>

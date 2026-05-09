@@ -27,7 +27,7 @@ From LLMs to Production Agents
 </div>
 
 <div class="abs-br m-6 flex gap-2">
-  <a href="https://github.com/seefor" target="_blank" alt="GitHub" title="GitHub"
+  <a href="https://github.com/YOUR_USERNAME/ai-networking-workshop" target="_blank" alt="GitHub" title="GitHub"
     class="text-xl slidev-icon-btn opacity-50 !border-none !hover:text-white">
     <carbon-logo-github />
   </a>
@@ -44,7 +44,7 @@ layout: intro
 - **Duration:** 3.25 hours
 - **Format:** Theory + hands-on labs
 - **Goal:** Build production-ready AI agents for network automation
-- **Stack:** Python, Anthropic Claude, Ollama, MCP
+- **Stack:** Python, Ollama (100% free), Mock Devices
 
 </v-clicks>
 
@@ -90,12 +90,18 @@ Make sure you have these installed and working:
 
 ### Python Packages
 ```bash
-pip install anthropic openai mcp flask streamlit
+pip install requests
 ```
 
-### Optional (for demos)
-- OpenAI API key
-- Anthropic API key (Claude)
+### Everything Uses Ollama - 100% Free!
+- ✅ No API keys required
+- ✅ No cloud services needed
+- ✅ Works offline after model download
+
+### NOT Required
+- ❌ Docker Desktop
+- ❌ Virtual machines
+- ❌ Network simulator software
 
 </v-clicks>
 
@@ -201,23 +207,26 @@ LLMs don't see words - they see **tokens** (sub-word chunks)
 Let's tokenize some network commands:
 
 ```python
-from anthropic import Anthropic
-client = Anthropic()
+import requests
 
-# Count tokens
+# Ollama API endpoint
+url = "http://localhost:11434/api/generate"
+
 text = """
 router bgp 65001
  neighbor 10.0.0.1 remote-as 65002
  neighbor 10.0.0.1 description CORE-RTR-01
 """
 
-response = client.messages.count_tokens(
-    model="claude-3-5-sonnet-20241022",
-    messages=[{"role": "user", "content": text}]
-)
+response = requests.post(url, json={
+    "model": "llama3.2:3b",
+    "prompt": text,
+    "stream": False
+})
 
-print(f"Tokens: {response.input_tokens}")
-# Output: Tokens: 47
+data = response.json()
+print(f"Prompt tokens: {data['prompt_eval_count']}")
+# Output: Tokens: ~45
 ```
 
 **Rule of thumb:** 1 token ≈ 0.75 words
@@ -364,18 +373,19 @@ Let's see temperature in action:
 prompt = "Generate a BGP configuration for AS 65001 with neighbor 10.0.0.1"
 
 # Temperature 0.0
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=200,
-    temperature=0.0,
-    messages=[{"role": "user", "content": prompt}]
-)
-print(response.content[0].text)
+response = requests.post("http://localhost:11434/api/generate", json={
+    "model": "llama3.2:3b",
+    "prompt": prompt,
+    "stream": False,
+    "options": {"temperature": 0.0, "num_predict": 200}
+})
+
+print(response.json()["response"])
 ```
 
 Run this 3 times - output should be **identical**
 
-Now try `temperature=1.5` - see the variation
+Now try `"temperature": 1.5` - see the variation
 
 </v-clicks>
 
@@ -1451,27 +1461,30 @@ class: text-center
 ## How API Calls Work
 
 ```python
-import anthropic
+import requests
 
-client = anthropic.Anthropic(api_key="sk-ant-...")
+url = "http://localhost:11434/api/generate"
+payload = {
+    "model": "llama3.2:3b",
+    "prompt": "What is BGP?",
+    "stream": False,
+    "options": {
+        "temperature": 0.7,
+        "num_predict": 1024
+    }
+}
 
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    messages=[
-        {"role": "user", "content": "What is BGP?"}
-    ]
-)
-
-print(response.content[0].text)
+response = requests.post(url, json=payload)
+data = response.json()
+print(data["response"])
 ```
 
 ### Key Components
-- **Authentication**: API key identifies you
-- **Model selection**: Which LLM to use
-- **Messages**: Conversation history
+- **Endpoint**: Local Ollama server URL
+- **Model selection**: Which local LLM to use
+- **Prompt**: Text input to the model
 - **Parameters**: Temperature, max_tokens, etc.
-- **Response**: Text + metadata (tokens used, stop reason)
+- **Response**: Generated text + metadata
 
 </v-clicks>
 
@@ -1963,19 +1976,16 @@ Let's start simple:
 
 ```python
 # chatbot_v1.py
-import anthropic
-
-client = anthropic.Anthropic()
+import requests
 
 def simple_chat(user_message):
-    response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=1024,
-        messages=[
-            {"role": "user", "content": user_message}
-        ]
-    )
-    return response.content[0].text
+    response = requests.post("http://localhost:11434/api/generate", json={
+        "model": "llama3.2:3b",
+        "prompt": user_message,
+        "stream": False,
+        "options": {"num_predict": 1024}
+    })
+    return response.json()["response"]
 
 # Test it
 print(simple_chat("What is OSPF?"))
@@ -1996,35 +2006,45 @@ Build a class to manage conversation state:
 
 ```python
 # chatbot_v2.py
-import anthropic
+import requests
 
 class NetworkChatbot:
     def __init__(self):
-        self.client = anthropic.Anthropic()
         self.conversation_history = []
+        self.system_prompt = "You are a network engineer assistant."
     
     def chat(self, user_message):
-        # Add user message to history
+        # Add to history
         self.conversation_history.append({
-            "role": "user",
-            "content": user_message
+            "role": "user", "content": user_message
         })
         
-        # Call LLM with full history
-        response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=1024,
-            messages=self.conversation_history
-        )
+        # Build prompt with history
+        prompt = self._build_prompt()
+        
+        # Call Ollama
+        response = requests.post("http://localhost:11434/api/generate", json={
+            "model": "llama3.2:3b",
+            "prompt": prompt,
+            "stream": False
+        })
         
         # Add assistant response to history
-        assistant_message = response.content[0].text
+        assistant_message = response.json()["response"]
         self.conversation_history.append({
-            "role": "assistant",
-            "content": assistant_message
+            "role": "assistant", "content": assistant_message
         })
         
         return assistant_message
+    
+    def _build_prompt(self):
+        # Combine system prompt + history
+        parts = [self.system_prompt, "\n\n"]
+        for msg in self.conversation_history:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            parts.append(f"{role}: {msg['content']}\n")
+        parts.append("Assistant: ")
+        return "".join(parts)
 ```
 
 </v-clicks>
@@ -2108,10 +2128,10 @@ class NetworkChatbot:
 
 ```python
 # After 50 messages:
-bot.token_count()  # Output: 125,000 tokens
+len(bot.conversation_history)  # Output: 50 messages
 
 # Next message fails:
-# Error: context_length_exceeded (max: 128,000)
+# Error: context_length_exceeded (max: 128,000 tokens)
 ```
 
 ## Solution: Truncate Old Messages
@@ -2119,7 +2139,7 @@ bot.token_count()  # Output: 125,000 tokens
 ```python
 class NetworkChatbot:
     def __init__(self, max_messages=20):
-        self.client = anthropic.Anthropic()
+        self.model = "llama3.2:3b"
         self.conversation_history = []
         self.max_messages = max_messages
     
@@ -2355,6 +2375,108 @@ class: text-center
 20 minutes
 
 ---
+layout: center
+---
+
+# 🎯 Workshop Infrastructure
+
+<v-clicks>
+
+## We're Using Mock Network Devices
+
+**Why mock devices instead of real infrastructure?**
+
+✅ **Zero setup time** - No VMs, no Docker, no containers  
+✅ **100% macOS compatible** - Works on any laptop  
+✅ **Same agent code** - Mock → Production with 1 function swap  
+✅ **Learn patterns, not tools** - Focus on AI, not networking setup
+
+## Our Mock Network Topology
+
+```
+spine1 (192.168.0.11) ──┬── leaf1 (192.168.0.21)
+                        └── leaf2 (192.168.0.22)
+spine2 (192.168.0.12) ──┘
+```
+
+**4-device spine-leaf network with:**
+- BGP routing
+- Interface states
+- Built-in troubleshooting scenarios
+
+</v-clicks>
+
+---
+
+# Mock Devices: What You Get
+
+<v-clicks>
+
+## Available Functions
+
+```python
+from mock_network_devices import *
+
+# Query device status
+get_device_status("spine1")
+# Returns: {"hostname": "spine1", "version": "4.28.0F", ...}
+
+# Check BGP neighbors
+get_bgp_summary("leaf1")
+# Returns: {"neighbors": [...], "total": 2, ...}
+
+# Get interface status
+get_interface_status("leaf2", "Ethernet1")
+# Returns: {"name": "Ethernet1", "status": "up", ...}
+
+# Test reachability
+ping_device("spine1", "192.168.0.21")
+# Returns: {"target": "192.168.0.21", "reachable": true, ...}
+```
+
+**Realistic Arista cEOS behavior - just in pure Python!**
+
+</v-clicks>
+
+---
+
+# Production Migration Path
+
+<v-clicks>
+
+## Workshop (Mock Devices)
+
+```python
+# mock_network_devices.py
+def get_device_status(device):
+    return MOCK_DEVICES.get(device, {
+        "hostname": device,
+        "version": "4.28.0F",
+        "uptime": "3 days, 2 hours",
+        ...
+    })
+```
+
+## Production (Your Network)
+
+```python
+# production_network_devices.py
+import paramiko
+
+def get_device_status(device):
+    ssh = paramiko.SSHClient()
+    ssh.connect(device, username="admin", password=...)
+    stdin, stdout, stderr = ssh.exec_command("show version")
+    output = stdout.read().decode()
+    return parse_arista_version(output)  # Parse real output
+```
+
+**Your agent code doesn't change at all!**  
+Just swap the import: `from production_network_devices import *`
+
+</v-clicks>
+
+---
 
 # What Makes an Agent?
 
@@ -2390,60 +2512,78 @@ LLM synthesizes final answer
 
 # Lab 4 - Part A: Define Network Tools
 
+We're using the mock devices from `examples/mock_network_devices.py`
+
 <v-clicks>
 
 ```python
-# tools.py
-def get_interface_status(device_name, interface):
-    """Get current status of a network interface"""
-    # In reality: SSH to device, run show command
-    # For lab: Return mock data
-    return {
-        "interface": interface,
-        "status": "up",
-        "description": "Link to Core Switch",
-        "speed": "10Gbps",
-        "input_rate": "234 Mbps",
-        "output_rate": "567 Mbps",
-        "input_errors": 0,
-        "output_errors": 0,
-        "last_cleared": "never"
-    }
+# Import mock network device functions
+from examples.mock_network_devices import (
+    get_device_status,
+    get_bgp_summary,
+    get_interface_status,
+    ping_device,
+    execute_command,
+    get_topology_info
+)
 
-def get_bgp_neighbors(device_name):
-    """Get BGP neighbor status"""
+# These functions return realistic network data
+# In production: Replace with SSH/API calls to real devices
+# Agent code stays identical!
+
+# Example: Get BGP neighbors
+def get_bgp_neighbors_tool(device_name):
+    """Get BGP neighbor status from mock device"""
+    result = get_bgp_summary(device_name)
     return {
-        "total_peers": 4,
-        "established": 3,
-        "neighbors": [
-            {"ip": "10.0.0.1", "state": "Established", "uptime": "3d2h"},
-            {"ip": "10.0.0.2", "state": "Established", "uptime": "1d5h"},
-            {"ip": "10.0.0.3", "state": "Established", "uptime": "2d1h"},
-            {"ip": "10.0.0.4", "state": "Idle", "uptime": "0h"}
-        ]
+        "device": device_name,
+        "total_peers": len(result.get("neighbors", [])),
+        "established": sum(1 for n in result["neighbors"] 
+                          if n["state"] == "Established"),
+        "neighbors": result["neighbors"]
     }
 ```
+
+**Key Point:** These are real Python functions that return structured data.  
+The agent doesn't know (or care) if they're mocks or production SSH calls!
 
 </v-clicks>
 
 ---
 
-# More Tools
+# More Mock Device Tools
 
 <v-clicks>
 
 ```python
-def search_logs(device_name, keyword, lines=50):
-    """Search device logs for keywords"""
-    # Simulate log search
-    if keyword.lower() == "bgp":
-        return """
-2024-01-15 14:32:11: %BGP-5-ADJCHANGE: neighbor 10.0.0.4 Down
-2024-01-15 14:32:08: %LINK-3-UPDOWN: Interface Gi0/1, changed state to down
-2024-01-15 14:31:55: %LINEPROTO-5-UPDOWN: Line protocol on Interface Gi0/1, changed state to down
-        """.strip()
-    return f"No matches found for '{keyword}'"
+# All available from mock_network_devices.py
 
+def get_device_status(device):
+    """Get device info (hostname, version, uptime, role)"""
+    pass
+
+def get_topology_info():
+    """Get full network topology (all devices and connections)"""
+    pass
+
+def execute_command(device, command):
+    """Execute show command (read-only, safe)"""
+    pass
+
+def ping_device(source, target):
+    """Test reachability between devices"""
+    pass
+```
+
+**Built-in Scenarios:**
+- ✅ All BGP sessions up on spine1, spine2, leaf1
+- ❌ leaf2 has BGP session down (Idle state)
+- ❌ leaf2 Ethernet3 interface is down
+- ✅ All other interfaces operational
+
+**Perfect for testing agent troubleshooting!**
+
+</v-clicks>
 def execute_ping(target, count=4):
     """Ping a network device"""
     import subprocess
@@ -2512,84 +2652,98 @@ TOOLS = [
 
 ---
 
-# Lab 4 - Part C: The Agentic Loop
+# Lab 4 - Part C: The Agentic Loop with Ollama
 
 <v-clicks>
 
+Since Ollama doesn't have native function calling, we use **structured prompts**:
+
 ```python
-# agentic_chatbot.py
-import anthropic
-from tools import get_interface_status, get_bgp_neighbors, search_logs, execute_ping
-from tool_schemas import TOOLS
+# agentic_network_bot.py
+import requests
+from mock_network_devices import get_device_status, get_bgp_summary
 
 class AgenticNetworkBot:
     def __init__(self):
-        self.client = anthropic.Anthropic()
         self.conversation_history = []
-        
-        # Map tool names to functions
-        self.tool_functions = {
-            "get_interface_status": get_interface_status,
-            "get_bgp_neighbors": get_bgp_neighbors,
-            "search_logs": search_logs,
-            "execute_ping": execute_ping
+        self.tools_map = {
+            "get_device_status": get_device_status,
+            "get_bgp_summary": get_bgp_summary,
         }
+        
+        # Tell LLM about available tools
+        self.system_prompt = """You are a network engineer.
+
+Available tools:
+- get_device_status(device) - Get device info
+- get_bgp_summary(device) - Get BGP neighbors
+
+When you need a tool, output:
+TOOL: tool_name
+ARGS: {"arg": "value"}
+"""
     
-    def chat(self, user_message):
-        # Add user message
+    def chat(self, user_message, max_iterations=5):
         self.conversation_history.append({
-            "role": "user",
-            "content": user_message
+            "role": "user", "content": user_message
         })
         
-        # Agentic loop: keep calling tools until LLM is done
-        while True:
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2048,
-                tools=TOOLS,
-                messages=self.conversation_history
-            )
+        for _ in range(max_iterations):
+            response = self._call_llm()
+            tool_call = self._parse_tool_call(response)
             
-            # Check what LLM wants to do
-            if response.stop_reason == "end_turn":
-                # LLM has final answer
-                final_text = self._extract_text(response.content)
+            if tool_call:
+                # Execute the tool
+                result = self.tools_map[tool_call["name"]](**tool_call["args"])
                 self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
+                    "role": "user",
+                    "content": f"Tool result: {json.dumps(result)}"
                 })
-                return final_text
+            else:
+                # No tool call = final answer
+                return response
 ```
 
 </v-clicks>
 
 ---
 
-# Agentic Loop (continued)
+# Tool Call Parsing
 
 <v-clicks>
 
 ```python
-            elif response.stop_reason == "tool_use":
-                # LLM wants to call tools
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-                
-                # Execute all requested tools
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"🔧 Calling: {block.name}({block.input})")
-                        
-                        # Get the function
-                        tool_func = self.tool_functions[block.name]
-                        
-                        # Execute it
-                        try:
-                            result = tool_func(**block.input)
+def _parse_tool_call(self, response):
+    """Parse structured output from LLM"""
+    lines = response.split('\n')
+    tool_name = None
+    tool_args = {}
+    
+    for line in lines:
+        if line.startswith("TOOL:"):
+            tool_name = line.replace("TOOL:", "").strip()
+        elif line.startswith("ARGS:"):
+            args_str = line.replace("ARGS:", "").strip()
+            tool_args = json.loads(args_str)
+    
+    if tool_name and tool_name in self.tools_map:
+        return {"name": tool_name, "args": tool_args}
+    
+    return None  # No tool call found
+
+def _build_prompt(self):
+    """Build full prompt with system + history"""
+    parts = [self.system_prompt, "\n\n"]
+    for msg in self.conversation_history:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        parts.append(f"{role}: {msg['content']}\n")
+    parts.append("Assistant: ")
+    return "".join(parts)
+```
+
+**Key Innovation:** Teach LLM to output structured commands!
+
+</v-clicks>
                         except Exception as e:
                             result = f"Error: {str(e)}"
                         
@@ -2786,17 +2940,28 @@ for block in response.content:
 
 ### What You Built
 
-✅ Agentic chatbot that can use tools  
+✅ Agentic chatbot that uses mock network devices  
 ✅ Multi-step reasoning and problem-solving  
 ✅ Network troubleshooting automation  
-✅ Safety mechanisms (read-only mode, validation)  
+✅ Production-ready pattern (just swap the backend!)  
 
 ### Key Insights
 
 - **Agents = LLM + Tools + Loop** - The pattern is simple
-- **LLM decides strategy** - You provide capabilities
+- **Mock devices accelerate learning** - Focus on AI, not infrastructure
+- **Same code → production** - Change `from mock_*` to `from production_*`
 - **Tool quality matters** - Good tools = good agents
-- **Safety is critical** - Always validate and log
+
+### Production Migration
+
+```python
+# Workshop
+from examples.mock_network_devices import get_device_status
+
+# Your network (Monday morning!)
+from production.network_devices import get_device_status
+# Rest of agent code unchanged!
+```
 
 ### Next Module
 
@@ -2824,7 +2989,7 @@ class: text-center
 ## Current State
 
 ```
-Your Chatbot:  Hardcoded tools, SSH functions
+Your Chatbot:  Hardcoded tools, mock device functions
 Claude Desktop: Filesystem tools
 ChatGPT:        Calculator, web search
 VS Code Copilot: Code tools
@@ -2835,12 +3000,13 @@ Everyone builds the same tools differently!
 ## What If...
 
 ```
-You build a tool server ONCE
+You build an MCP server ONCE with your network tools
 ↓
 Any MCP client can use it
 ↓
 Claude Desktop ✅
 Your chatbot ✅
+VS Code ✅
 Future apps ✅
 ```
 
@@ -3292,7 +3458,7 @@ touch server.py tools.py resources.py
 ### Install Dependencies
 
 ```bash
-pip install anthropic-mcp paramiko netmiko
+pip install requests paramiko netmiko
 ```
 
 **Note:** For the lab, we'll use mock data. In production, add:
@@ -3756,49 +3922,43 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 ---
 
-# Challenge: Add Real SSH Tool
+# Challenge: Production Migration
 
 <v-clicks>
 
-```python
-# Install netmiko
-# pip install netmiko
+## From Mock to Real SSH
 
+**Workshop (Mock Devices):**
+```python
+# In your MCP server
+from examples.mock_network_devices import get_device_status, get_bgp_summary
+
+async def call_tool(name, arguments):
+    if name == "get_device_status":
+        result = get_device_status(arguments["device"])
+        return [TextContent(type="text", text=json.dumps(result))]
+```
+
+**Production (Real Devices):**
+```python
+# pip install netmiko
 from netmiko import ConnectHandler
 
-Tool(
-    name="execute_command",
-    description="Execute a show command on a network device via SSH",
-    inputSchema={
-        "type": "object",
-        "properties": {
-            "device": {"type": "string"},
-            "command": {"type": "string", "description": "Command to execute (show commands only)"},
-            "username": {"type": "string"},
-            "password": {"type": "string"}
-        },
-        "required": ["device", "command", "username", "password"]
-    }
-)
-
-# In call_tool():
-elif name == "execute_command":
-    # Validate: only allow show commands
-    if not arguments["command"].startswith("show"):
-        raise ValueError("Only 'show' commands are allowed")
-    
-    device_config = {
-        "device_type": "cisco_ios",
-        "host": arguments["device"],
-        "username": arguments["username"],
-        "password": arguments["password"],
-    }
-    
-    with ConnectHandler(**device_config) as conn:
-        output = conn.send_command(arguments["command"])
-    
-    return [TextContent(type="text", text=output)]
+async def call_tool(name, arguments):
+    if name == "get_device_status":
+        device_config = {
+            "device_type": "arista_eos",
+            "host": arguments["device"],
+            "username": os.getenv("NETWORK_USER"),
+            "password": os.getenv("NETWORK_PASS"),
+        }
+        with ConnectHandler(**device_config) as conn:
+            output = conn.send_command("show version | json")
+        result = json.loads(output)  # Parse real output
+        return [TextContent(type="text", text=json.dumps(result))]
 ```
+
+**MCP clients don't know or care!** Same interface, different backend.
 
 </v-clicks>
 
@@ -3817,8 +3977,22 @@ logger.info(f"Args: {arguments}")  # BAD - may contain passwords
 
 # Use environment variables for credentials
 import os
-SSH_USERNAME = os.getenv("NETWORK_SSH_USER")
-SSH_PASSWORD = os.getenv("NETWORK_SSH_PASS")
+NETWORK_USER = os.getenv("NETWORK_SSH_USER")
+NETWORK_PASS = os.getenv("NETWORK_SSH_PASS")  # Or use key-based auth!
+```
+
+### 2. Error Handling
+
+```python
+# Mock devices always succeed
+# Real devices can fail in many ways
+try:
+    with ConnectHandler(**device_config) as conn:
+        output = conn.send_command("show version")
+except NetmikoTimeoutException:
+    return [TextContent(type="text", text="Device unreachable")]
+except NetmikoAuthenticationException:
+    return [TextContent(type="text", text="Authentication failed")]
 ```
 
 ### 2. Rate Limiting
@@ -3959,13 +4133,15 @@ Results → LLM → Final answer → User
 ```python
 # chatbot_with_mcp.py
 import asyncio
-from anthropic import Anthropic
+import requests
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+import requests
 
 class MCPChatbot:
     def __init__(self):
-        self.anthropic_client = Anthropic()
+        self.ollama_url = "http://localhost:11434/api/generate"
+        self.model = "llama3.2:3b"
         self.conversation_history = []
         self.mcp_session = None
         self.available_tools = []
@@ -3989,6 +4165,8 @@ class MCPChatbot:
         
         print(f"✅ Connected to MCP server: {server_script_path}")
 ```
+
+**Note:** MCP integration is optional/advanced. Workshop focuses on Ollama basics.
 
 </v-clicks>
 
@@ -4044,34 +4222,20 @@ class MCPChatbot:
     async def chat(self, user_message):
         """Chat with MCP tool support"""
         
-        # Add user message
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_message
-        })
+        # Same agentic pattern as Lab 4!
+        # 1. Add user message to history
+        # 2. Call LLM with tools available
+        # 3. Parse tool calls (structured prompts)
+        # 4. Execute via MCP
+        # 5. Feed results back
+        # 6. Repeat until final answer
         
-        # Agentic loop
-        while True:
-            # Call LLM with MCP tools
-            response = self.anthropic_client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2048,
-                tools=self.available_tools,
-                messages=self.conversation_history
-            )
-            
-            if response.stop_reason == "end_turn":
-                # Final answer
-                final_text = next(
-                    (block.text for block in response.content if hasattr(block, "text")),
-                    None
-                )
-                self.conversation_history.append({
-                    "role": "assistant",
-                    "content": response.content
-                })
-                return final_text
+        # Implementation similar to agentic_network_bot.py
+        # but tools come from MCP server instead of local functions
 ```
+
+**Key Point:** MCP makes tools portable across different AI applications.  
+Same Ollama agent pattern, just with remote tool execution!
 
 </v-clicks>
 
@@ -4226,3 +4390,15 @@ if __name__ == "__main__":
 </v-clicks>
 
 ---
+
+# Testing Scenarios
+
+<v-clicks>
+
+### 1. Single Tool Call
+
+```
+You: Ping google.com
+🔧 Calling MCP tool: ping_device({'target': 'google.com', 'count': 4})
+✅ Result: PING google.com (142.250.80.46): 56 data bytes...
+
