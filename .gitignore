@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+<<<<<<< HEAD
 *$py.class
 *.so
 .Python
@@ -63,3 +64,20 @@ credentials.json
 
 # Workshop specific
 conversation_*.json
+=======
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Containerlab generated files
+clab-*/
+*.bak
+
+# OS/editor
+.DS_Store
+.vscode/settings.json
+>>>>>>> b125807 (Initial commit)

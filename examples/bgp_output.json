@@ -1,0 +1,5 @@
+{
+  "device": "leaf1",
+  "command": "show ip bgp summary",
+  "output": "BGP summary information for VRF default\nRouter identifier 10.255.1.1, local AS number 65101\nNeighbor        V AS     MsgRcvd MsgSent InQ OutQ Up/Down State/PfxRcd\n10.0.0.0        4 65000  102     101     0   0    01:12:33 1"
+}

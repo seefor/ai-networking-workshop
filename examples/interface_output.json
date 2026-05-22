@@ -1,0 +1,5 @@
+{
+  "device": "leaf1",
+  "command": "show interfaces status",
+  "output": "Port       Name            Status       Vlan     Duplex Speed  Type\nEt1        P2P_TO_SPINE1   connected    routed   full   10G    10GBASE-SR\nEt2        P2P_TO_LEAF2    notconnect   routed   full   10G    10GBASE-SR\nMa0        MGMT            connected    routed   full   1G     10/100/1000"
+}

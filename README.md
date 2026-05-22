@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI Networking Workshop: From LLMs to Production Agents
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -403,3 +404,268 @@ python3 labs/lab1-ollama/simple_ollama_test.py
 **Created by:** Sif Baksh  
 **License:** MIT  
 **Cost:** $0 Forever
+=======
+# AI Network Automation MCP
+
+A workshop-ready starter repo for building your first AI-powered network automation toolchain.
+
+The goal is simple:
+
+> Start with Python. Talk to real network devices. Use Claude to reason over network data. Use the P.E.N.E. framework to keep the model grounded. Wrap the useful network functions as MCP tools.
+
+This repo is designed for a PacketCoders-style workshop using Containerlab and Arista cEOS.
+
+---
+
+## What You Will Build
+
+By the end of the first workshop, you will have:
+
+1. A small Arista cEOS lab running in Containerlab.
+2. Python scripts that connect to the devices and collect network state.
+3. A Claude API example that analyzes network output using the P.E.N.E. framework.
+4. A read-only MCP server exposing network inspection tools.
+5. A clear foundation for later videos: troubleshooting, pyATS parsing, NetBox intent checks, and safe change workflows.
+
+---
+
+## Repo Layout
+
+```text
+ai-network-automation-mcp/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── Makefile
+├── lab/
+│   ├── topology.clab.yml
+│   └── configs/
+│       ├── spine1.cfg
+│       ├── leaf1.cfg
+│       └── leaf2.cfg
+├── scripts/
+│   ├── 01_python_basics.py
+│   ├── 02_inventory_loader.py
+│   ├── 03_connect_to_device.py
+│   ├── 04_get_interfaces.py
+│   └── 05_claude_pene_analysis.py
+├── prompts/
+│   ├── bad_prompt.txt
+│   └── pene_network_analysis_prompt.txt
+├── mcp_server/
+│   ├── server.py
+│   ├── network_tools.py
+│   └── inventory.yml
+├── examples/
+│   ├── interface_output.json
+│   ├── bgp_output.json
+│   └── claude_response_example.md
+├── docs/
+│   ├── episode-01-workshop-outline.md
+│   ├── instructor-notes.md
+│   └── mcp-client-config.md
+└── tests/
+    └── test_command_safety.py
+```
+
+---
+
+## Prerequisites
+
+You need:
+
+- Docker
+- Containerlab
+- Python 3.10+
+- Arista cEOS image imported into Docker
+- Anthropic API key for the Claude example
+
+Import your cEOS image into Docker using the tag referenced in `lab/topology.clab.yml`.
+
+Example:
+
+```bash
+docker import cEOS64-lab-4.32.0F.tar.xz ceos:4.32.0F
+```
+
+---
+
+## Setup
+
+Create and activate a Python virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Copy the environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your Anthropic API key:
+
+```bash
+ANTHROPIC_API_KEY=your_api_key_here
+```
+
+---
+
+## Start the Lab
+
+From the repo root:
+
+```bash
+containerlab deploy -t lab/topology.clab.yml
+```
+
+Confirm the containers are running:
+
+```bash
+docker ps
+```
+
+Destroy the lab when finished:
+
+```bash
+containerlab destroy -t lab/topology.clab.yml --cleanup
+```
+
+---
+
+## Run the Python Examples
+
+Start with the basics:
+
+```bash
+python scripts/01_python_basics.py
+```
+
+Load the device inventory:
+
+```bash
+python scripts/02_inventory_loader.py
+```
+
+Connect to a device:
+
+```bash
+python scripts/03_connect_to_device.py leaf1
+```
+
+Get interface status:
+
+```bash
+python scripts/04_get_interfaces.py leaf1
+```
+
+Analyze sample network output with Claude and P.E.N.E.:
+
+```bash
+python scripts/05_claude_pene_analysis.py examples/interface_output.json
+```
+
+---
+
+## Run the MCP Server
+
+Start the MCP server:
+
+```bash
+python mcp_server/server.py
+```
+
+By default, the server uses Streamable HTTP and listens on:
+
+```text
+http://localhost:8000/mcp
+```
+
+You can test it with MCP Inspector:
+
+```bash
+npx -y @modelcontextprotocol/inspector
+```
+
+Then connect to:
+
+```text
+http://localhost:8000/mcp
+```
+
+---
+
+## MCP Tools Included
+
+The first version exposes read-only tools:
+
+| Tool | Purpose |
+|---|---|
+| `list_devices` | Show the devices in the lab inventory. |
+| `get_device_facts` | Run `show version` against a selected device. |
+| `check_interfaces` | Run `show interfaces status` against a selected device. |
+| `run_safe_show_command` | Run approved read-only `show` commands. |
+
+The point of episode one is not to make changes.
+
+The point is to teach this path:
+
+```text
+Python function
+↓
+Network automation function
+↓
+Claude reasoning prompt
+↓
+MCP tool
+↓
+AI-assisted network operations
+```
+
+---
+
+## Safety Boundary
+
+This starter kit intentionally blocks configuration commands.
+
+Allowed command style:
+
+```text
+show version
+show interfaces status
+show ip route
+show ip bgp summary
+```
+
+Blocked command style:
+
+```text
+configure terminal
+reload
+copy
+delete
+write memory
+bash
+```
+
+That makes the first workshop safer and easier to teach.
+
+---
+
+## Suggested Episode 1 Title
+
+**Build Your First AI Network Automation Tool with Python, Claude, P.E.N.E., and MCP**
+
+Subtitle:
+
+**Using Containerlab and Arista cEOS to move from scripts to structured AI-powered network workflows.**
+>>>>>>> b125807 (Initial commit)
