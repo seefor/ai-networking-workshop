@@ -90,9 +90,15 @@ Available Tools:
 Available devices: spine1, spine2, leaf1, leaf2
 """
         
-        self.system_prompt = f"""You are an expert network engineer troubleshooting a data center network.
+self.system_prompt = f"""You are an expert network engineer troubleshooting a data center network.
 
 {self.tools_description}
+
+CRITICAL RULES FOR ARGUMENTS:
+- 'ping_device' MUST have BOTH "source" and "target" arguments (e.g., TOOL: ping_device ARGS: {{"source": "spine1", "target": "192.168.0.21"}}). NEVER pass "device".
+- 'get_device_status' ONLY takes a "device" argument. NEVER include "interface".
+- 'get_interface_status' MUST have BOTH "device" and "interface" arguments.
+- 'execute_command' MUST have BOTH "device" and "command" arguments.
 
 When you need information, output a tool call in this EXACT format:
 TOOL: tool_name
